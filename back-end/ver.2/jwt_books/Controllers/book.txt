@@ -1,0 +1,2435 @@
+using Microsoft.AspNetCore.Mvc;
+using System.Data;
+using Microsoft.Data.SqlClient;
+using Newtonsoft.Json.Linq;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+
+namespace jwt_demo.Controllers;
+
+[ApiController]
+[Route("[controller]")]
+public class BookController : ControllerBase
+{
+    private readonly IConfiguration _configuration;
+    private readonly JwtToken _jwt;
+
+    public BookController(IConfiguration configuration)
+    {
+        _configuration = configuration;
+        _jwt = new JwtToken();
+    }
+
+    // GET: /books
+    [AllowAnonymous]
+    [HttpGet]
+    public async Task<ActionResult> GetBooks()
+    {
+        try
+        {
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            using SqlConnection connection = new(connectionString);
+            await connection.OpenAsync();
+
+            using SqlCommand command = new()
+            {
+                Connection = connection,
+                CommandType = CommandType.Text,
+                CommandText = "SELECT * FROM Books"
+            };
+
+            using SqlDataReader reader = await command.ExecuteReaderAsync();
+            var books = new List<Dictionary<string, object>>();
+
+            while (await reader.ReadAsync())
+            {
+                var book = new Dictionary<string, object>();
+                for (int i = 0; i < reader.FieldCount; i++)
+                {
+                    book[reader.GetName(i)] = reader.IsDBNull(i) ? null : reader.GetValue(i);
+                }
+                books.Add(book);
+            }
+
+            return Ok(new { data = books });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    // POST: /books/add
+    [Authorize(Roles = "admin")]
+    [HttpPost("add")]
+    public async Task<ActionResult> AddBook([FromBody] JObject bookData)
+    {
+        try
+        {
+            // Kiểm tra các trường bắt buộc
+            if (bookData["Title"] == null || bookData["ISBN"] == null || bookData["Price"] == null)
+            {
+                return BadRequest(new { message = "Title, ISBN, and Price are required." });
+            }
+
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            using SqlConnection connection = new(connectionString);
+            await connection.OpenAsync();
+
+            using SqlCommand command = new()
+            {
+                Connection = connection,
+                CommandType = CommandType.StoredProcedure,
+                CommandText = "AddBook"
+            };
+
+            // Thêm các tham số cho thủ tục
+            command.Parameters.AddWithValue("@Title", bookData["Title"].Value<string>());
+            command.Parameters.AddWithValue("@Author", bookData["Author"]?.Value<string>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@Description", bookData["Description"]?.Value<string>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@ISBN", bookData["ISBN"].Value<string>());
+            command.Parameters.AddWithValue("@PublishedDate", bookData["PublishedDate"]?.Value<DateTime?>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@Price", bookData["Price"].Value<decimal>());
+            command.Parameters.AddWithValue("@StockQuantity", bookData["StockQuantity"]?.Value<int>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@IsAvailableForRent", bookData["IsAvailableForRent"]?.Value<bool>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@RentPrice", bookData["RentPrice"]?.Value<decimal?>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@CategoryID", bookData["CategoryID"]?.Value<int>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@CoverImage", bookData["CoverImage"]?.Value<string>() ?? (object)DBNull.Value);
+
+            await command.ExecuteNonQueryAsync();
+
+            return Ok(new { message = "Book added successfully." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    // PUT: /books/update/{id}
+    [Authorize(Roles = "admin")]
+    [HttpPut("update/{id}")]
+    public async Task<ActionResult> UpdateBook(int id, [FromBody] JObject bookData)
+    {
+        try
+        {
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            using SqlConnection connection = new(connectionString);
+            await connection.OpenAsync();
+
+            using SqlCommand command = new()
+            {
+                Connection = connection,
+                CommandType = CommandType.StoredProcedure,
+                CommandText = "UpdateBookByAdmin"
+            };
+
+            // Thêm tham số cho thủ tục
+            command.Parameters.AddWithValue("@BookID", id);
+            command.Parameters.AddWithValue("@Title", bookData["Title"]?.Value<string>());
+            command.Parameters.AddWithValue("@Author", bookData["Author"]?.Value<string>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@Description", bookData["Description"]?.Value<string>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@Price", bookData["Price"]?.Value<decimal>());
+            command.Parameters.AddWithValue("@StockQuantity", bookData["StockQuantity"]?.Value<int>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@IsAvailableForRent", bookData["IsAvailableForRent"]?.Value<bool>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@RentPrice", bookData["RentPrice"]?.Value<decimal?>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@CoverImage", bookData["CoverImage"]?.Value<string>() ?? (object)DBNull.Value);
+
+            await command.ExecuteNonQueryAsync();
+
+            return Ok(new { message = "Book updated successfully." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    // DELETE: /books/delete/{id}
+    [Authorize(Roles = "admin")]
+    [HttpDelete("delete/{id}")]
+    public async Task<ActionResult> DeleteBook(int id)
+    {
+        try
+        {
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            using SqlConnection connection = new(connectionString);
+            await connection.OpenAsync();
+
+            using SqlCommand command = new()
+            {
+                Connection = connection,
+                CommandType = CommandType.StoredProcedure,
+                CommandText = "DeleteBookByAdmin"
+            };
+
+            command.Parameters.AddWithValue("@BookID", id);
+            await command.ExecuteNonQueryAsync();
+
+            return Ok(new { message = "Book deleted successfully." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+}
+
+
+
+
+// BookController
+using Microsoft.AspNetCore.Mvc;
+using System.Data;
+using Microsoft.Data.SqlClient;
+using Newtonsoft.Json.Linq;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+
+namespace jwt_demo.Controllers;
+
+[ApiController]
+[Route("[controller]")] // Updated route here
+public class BookController : ControllerBase
+{
+    private readonly IConfiguration _configuration;
+    private readonly JwtToken _jwt;
+
+    public BookController(IConfiguration configuration)
+    {
+        _configuration = configuration;
+        _jwt = new JwtToken();
+    }
+
+    public class Book
+    {
+        public string Title { get; set; }
+        public string ISBN { get; set; }
+        // Thêm các thuộc tính khác
+    }
+
+    [AllowAnonymous]
+    // GET: /books
+    [HttpGet(Name = "Get_Books")]
+    public async Task<ActionResult> GetBooks()
+    {
+        try
+        {
+            string authHeader = Request.Headers["Authorization"];
+            if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
+            {
+                return Unauthorized(new { message = "Missing or invalid Authorization header" });
+            }
+
+            string token = authHeader["Bearer ".Length..].Trim();
+            if (!_jwt.ValidateToken(token, out ClaimsPrincipal? claims))
+            {
+                return Unauthorized(new { message = "Token is invalid" });
+            }
+
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            using SqlConnection connection = new(connectionString);
+            await connection.OpenAsync();
+
+            using SqlCommand command = new()
+            {
+                Connection = connection,
+                CommandType = CommandType.Text,
+                CommandText = "SELECT * FROM Books"
+            };
+
+            using SqlDataReader reader = await command.ExecuteReaderAsync();
+            var books = new List<Dictionary<string, object>>();
+
+            while (await reader.ReadAsync())
+            {
+                var book = new Dictionary<string, object>();
+                for (int i = 0; i < reader.FieldCount; i++)
+                {
+                    book[reader.GetName(i)] = reader.IsDBNull(i) ? null : reader.GetValue(i);
+                }
+                books.Add(book);
+            }
+
+            return Ok(new { data = books });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    // [HttpGet]
+    // public async Task<ActionResult<IEnumerable<Book>>> GetBooks()
+    // {
+    //     try
+    //     {
+    //         using var connection = new SqlConnection(_connectionString);
+    //         await connection.OpenAsync();
+
+    //         var command = new SqlCommand("SELECT * FROM Books", connection);
+    //         using var reader = await command.ExecuteReaderAsync();
+
+    //         var books = new List<Book>();
+    //         while (await reader.ReadAsync())
+    //         {
+    //             var book = new Book
+    //             {
+    //                 // Gán các thuộc tính từ reader
+    //                 var book = new Dictionary<string, object>();
+    //                 for (int i = 0; i < reader.FieldCount; i++)
+    //                 {
+    //                     book[reader.GetName(i)] = reader.IsDBNull(i) ? null : reader.GetValue(i);
+    //                 }
+    //                 books.Add(book);
+    //             };
+    //             books.Add(book);
+    //         }
+
+    //         return Ok(books);
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         return BadRequest(new { message = ex.Message });
+    //     }
+    // }
+
+
+    [AllowAnonymous]
+    // POST: /books/add
+    [HttpPost("add")]
+    public async Task<ActionResult> AddBook()
+    {
+        try
+        {
+            using var reader = new StreamReader(Request.Body);
+            var requestBody = await reader.ReadToEndAsync();
+            var bookData = JObject.Parse(requestBody);
+
+            // Kiểm tra các trường bắt buộc
+            if (bookData["Title"] == null || bookData["ISBN"] == null || bookData["Price"] == null)
+            {
+                return BadRequest(new { message = "Title, ISBN, and Price are required." });
+            }
+
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            using SqlConnection connection = new(connectionString);
+            await connection.OpenAsync();
+
+            using SqlCommand command = new()
+            {
+                Connection = connection,
+                CommandType = CommandType.StoredProcedure,
+                CommandText = "AddBook"
+            };
+
+            // Thêm các tham số cho thủ tục
+            command.Parameters.AddWithValue("@Title", bookData["Title"].Value<string>());
+            command.Parameters.AddWithValue("@Author", bookData["Author"]?.Value<string>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@Description", bookData["Description"]?.Value<string>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@ISBN", bookData["ISBN"].Value<string>());
+            command.Parameters.AddWithValue("@PublishedDate", bookData["PublishedDate"]?.Value<DateTime?>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@Price", bookData["Price"].Value<decimal>());
+            command.Parameters.AddWithValue("@StockQuantity", bookData["StockQuantity"]?.Value<int>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@IsAvailableForRent", bookData["IsAvailableForRent"]?.Value<bool>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@RentPrice", bookData["RentPrice"]?.Value<decimal?>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@CategoryID", bookData["CategoryID"]?.Value<int>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@CoverImage", bookData["CoverImage"]?.Value<string>() ?? (object)DBNull.Value);
+
+            await command.ExecuteNonQueryAsync();
+
+            return Ok(new { message = "Book added successfully." });
+        }
+        catch (Exception ex)
+        {
+            // Ghi lại lỗi để phân tích
+            Console.WriteLine($"Error: {ex.Message}, StackTrace: {ex.StackTrace}");
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+
+    // [HttpPost("add")]
+    // public async Task<ActionResult> AddBook()
+    // {
+    //     try
+    //     {
+    // string authHeader = Request.Headers["Authorization"];
+    // if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
+    // {
+    //     return Unauthorized(new { message = "Missing or invalid Authorization header" });
+    // }
+
+    // string token = authHeader["Bearer ".Length..].Trim();
+    // if (!_jwt.ValidateToken(token, out ClaimsPrincipal? claims))
+    // {
+    //     return Unauthorized(new { message = "Token is invalid" });
+    // }
+
+    // // Kiểm tra xem claims có null không
+    // if (claims == null)
+    // {
+    //     return Unauthorized(new { message = "Claims are null" });
+    // }
+
+    // Ghi lại tất cả claims để kiểm tra
+    // foreach (var claim in claims.Claims)
+    // {
+    //     Console.WriteLine($"Claim Type: {claim.Type}, Claim Value: {claim.Value}");
+    // }
+
+    // var userRole = claims.FindFirst(c => c.Type == "Role")?.Value;
+    // Console.WriteLine($"User Role: {userRole}"); // Ghi lại vai trò người dùng
+
+    // Kiểm tra xem người dùng có phải là quản trị viên không
+    // if (userRole != "admin")
+    // {
+    //     return Unauthorized(new { message = "You do not have permission to perform this action." });
+    // }
+
+    // var userName = claims.FindFirst(c => c.Type == "UserName")?.Value;
+
+    // using var reader = new StreamReader(Request.Body);
+    // var requestBody = await reader.ReadToEndAsync();
+    // var bookData = JObject.Parse(requestBody);
+
+    // // Kiểm tra các trường bắt buộc
+    // if (bookData["Title"] == null || bookData["ISBN"] == null || bookData["Price"] == null)
+    // {
+    //     return BadRequest(new { message = "Title, ISBN, and Price are required." });
+    // }
+
+    //         string connectionString = _configuration.GetConnectionString("DefaultConnection");
+    //         using SqlConnection connection = new(connectionString);
+    //         await connection.OpenAsync();
+
+    //         using SqlCommand command = new()
+    //         {
+    //             Connection = connection,
+    //             CommandType = CommandType.StoredProcedure,
+    //             CommandText = "AddBook"
+    //         };
+
+    //         // Thêm các tham số cho thủ tục
+    //         command.Parameters.AddWithValue("@Title", bookData["Title"].Value<string>());
+    //         command.Parameters.AddWithValue("@Author", bookData["Author"]?.Value<string>() ?? (object)DBNull.Value);
+    //         command.Parameters.AddWithValue("@Description", bookData["Description"]?.Value<string>() ?? (object)DBNull.Value);
+    //         command.Parameters.AddWithValue("@ISBN", bookData["ISBN"].Value<string>());
+    //         command.Parameters.AddWithValue("@PublishedDate", bookData["PublishedDate"]?.Value<DateTime?>() ?? (object)DBNull.Value);
+    //         command.Parameters.AddWithValue("@Price", bookData["Price"].Value<decimal>());
+    //         command.Parameters.AddWithValue("@StockQuantity", bookData["StockQuantity"]?.Value<int>() ?? (object)DBNull.Value);
+    //         command.Parameters.AddWithValue("@IsAvailableForRent", bookData["IsAvailableForRent"]?.Value<bool>() ?? (object)DBNull.Value);
+    //         command.Parameters.AddWithValue("@RentPrice", bookData["RentPrice"]?.Value<decimal?>() ?? (object)DBNull.Value);
+    //         command.Parameters.AddWithValue("@CategoryID", bookData["CategoryID"]?.Value<int>() ?? (object)DBNull.Value);
+    //         command.Parameters.AddWithValue("@CoverImage", bookData["CoverImage"]?.Value<string>() ?? (object)DBNull.Value);
+
+    //         await command.ExecuteNonQueryAsync();
+
+    //         return Ok(new { message = "Book added successfully." });
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         // Ghi lại lỗi để phân tích
+    //         Console.WriteLine($"Error: {ex.Message}, StackTrace: {ex.StackTrace}");
+    //         return BadRequest(new { message = ex.Message, stackTrace = ex.StackTrace });
+    //     }
+    // }
+
+    // [HttpPost("add")]
+    // public async Task<ActionResult> AddBook([FromBody] Book book)
+    // {
+    //     if (book == null || string.IsNullOrEmpty(book.Title) || string.IsNullOrEmpty(book.ISBN))
+    //     {
+    //         return BadRequest(new { message = "Missing required fields" });
+    //     }
+
+    //     try
+    //     {
+    //         using var connection = new SqlConnection(_connectionString);
+    //         await connection.OpenAsync();
+
+    //         var command = new SqlCommand("AddBookByAdmin", connection)
+    //         {
+    //             CommandType = CommandType.StoredProcedure
+    //         };
+    //         // Thêm các tham số cho thủ tục
+
+    //         await command.ExecuteNonQueryAsync();
+    //         return Ok(new { message = "Book added successfully." });
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         return BadRequest(new { message = ex.Message });
+    //     }
+    // }
+
+
+    [AllowAnonymous]
+    // PUT: /books/update/{id}
+    [HttpPut("update/{id}")]
+    public async Task<ActionResult> UpdateBook(int id)
+    {
+        try
+        {
+            string authHeader = Request.Headers["Authorization"];
+            if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
+            {
+                return Unauthorized(new { message = "Missing or invalid Authorization header" });
+            }
+
+            string token = authHeader["Bearer ".Length..].Trim();
+            if (!_jwt.ValidateToken(token, out ClaimsPrincipal? claims))
+            {
+                return Unauthorized(new { message = "Token is invalid" });
+            }
+
+            var userRole = claims?.FindFirst(c => c.Type == "Role")?.Value;
+
+            // Kiểm tra xem người dùng có phải là quản trị viên không
+            if (userRole != "admin")
+            {
+                return Unauthorized(new { message = "You do not have permission to perform this action." });
+            }
+
+            var userName = claims?.FindFirst(c => c.Type == "UserName")?.Value;
+
+            using var reader = new StreamReader(Request.Body);
+            var requestBody = await reader.ReadToEndAsync();
+            var bookData = JObject.Parse(requestBody);
+
+            // Kiểm tra các trường bắt buộc
+            if (bookData["Title"] == null || bookData["Price"] == null)
+            {
+                return BadRequest(new { message = "Title and Price are required." });
+            }
+
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            using SqlConnection connection = new(connectionString);
+            await connection.OpenAsync();
+
+            using SqlCommand command = new()
+            {
+                Connection = connection,
+                CommandType = CommandType.StoredProcedure,
+                CommandText = "UpdateBookByAdmin"
+            };
+
+            // Thêm tham số cho thủ tục
+            command.Parameters.AddWithValue("@BookID", id);
+            command.Parameters.AddWithValue("@Title", bookData["Title"]?.Value<string>());
+            command.Parameters.AddWithValue("@Author", bookData["Author"]?.Value<string>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@Description", bookData["Description"]?.Value<string>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@Price", bookData["Price"]?.Value<decimal>());
+            command.Parameters.AddWithValue("@StockQuantity", bookData["StockQuantity"]?.Value<int>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@IsAvailableForRent", bookData["IsAvailableForRent"]?.Value<bool>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@RentPrice", bookData["RentPrice"]?.Value<decimal?>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@CoverImage", bookData["CoverImage"]?.Value<string>() ?? (object)DBNull.Value);
+
+            await command.ExecuteNonQueryAsync();
+
+            return Ok(new { message = "Book updated successfully." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message, stackTrace = ex.StackTrace });
+        }
+    }
+
+    // [HttpPut("update/{id}")]
+    // public async Task<ActionResult> UpdateBook(int id, [FromBody] Book book)
+    // {
+    //     if (book == null || string.IsNullOrEmpty(book.Title))
+    //     {
+    //         return BadRequest(new { message = "Title is required." });
+    //     }
+
+    //     try
+    //     {
+    //         using var connection = new SqlConnection(_connectionString);
+    //         await connection.OpenAsync();
+
+    //         var command = new SqlCommand("UpdateBookByAdmin", connection)
+    //         {
+    //             CommandType = CommandType.StoredProcedure
+    //         };
+    //         // Thêm các tham số cho thủ tục
+
+    //         await command.ExecuteNonQueryAsync();
+    //         return Ok(new { message = "Book updated successfully." });
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         return BadRequest(new { message = ex.Message });
+    //     }
+    // }
+
+    [Authorize(Roles = "admin")]
+    // DELETE: /books/delete/{id}
+    [HttpDelete("delete/{id}")]
+    public async Task<ActionResult> DeleteBook(int id)
+    {
+        try
+        {
+            // Lấy token từ header Authorization
+            string authHeader = Request.Headers["Authorization"];
+            if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
+            {
+                return Unauthorized(new { message = "Missing or invalid Authorization header" });
+            }
+
+            string token = authHeader["Bearer ".Length..].Trim();
+            if (!_jwt.ValidateToken(token, out ClaimsPrincipal? claims))
+            {
+                return Unauthorized(new { message = "Token is invalid" });
+            }
+
+            var userName = claims?.FindFirst(c => c.Type == "UserName")?.Value;
+
+            // Lấy UserID từ tên người dùng
+            int adminUserId;
+            using (var sqlConnection = new SqlConnection(_configuration.GetConnectionString("DefaultConnection")))
+            {
+                await sqlConnection.OpenAsync();
+                using (var sqlCommand = new SqlCommand("SELECT UserID FROM Users WHERE UserName = @UserName", sqlConnection))
+                {
+                    sqlCommand.Parameters.AddWithValue("@UserName", userName);
+                    var result = await sqlCommand.ExecuteScalarAsync();
+                    if (result == null)
+                    {
+                        return NotFound(new { message = "User not found." });
+                    }
+                    adminUserId = (int)result;
+                }
+            }
+
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            using SqlConnection connection = new(connectionString);
+            await connection.OpenAsync();
+
+            using SqlCommand command = new()
+            {
+                Connection = connection,
+                CommandType = CommandType.StoredProcedure,
+                CommandText = "DeleteBookByAdmin"
+            };
+
+            command.Parameters.AddWithValue("@AdminUserID", adminUserId);
+            command.Parameters.AddWithValue("@BookID", id);
+
+            await command.ExecuteNonQueryAsync();
+
+            return Ok(new { message = "Book deleted successfully." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message, stackTrace = ex.StackTrace });
+        }
+    }
+
+    // [HttpDelete("delete/{id}")]
+    // public async Task<ActionResult> DeleteBook(int id)
+    // {
+    //     try
+    //     {
+    //         using var connection = new SqlConnection(_connectionString);
+    //         await connection.OpenAsync();
+
+    //         var command = new SqlCommand("DeleteBookByAdmin", connection)
+    //         {
+    //             CommandType = CommandType.StoredProcedure
+    //         };
+    //         command.Parameters.AddWithValue("@BookID", id);
+
+    //         await command.ExecuteNonQueryAsync();
+    //         return Ok(new { message = "Book deleted successfully." });
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         return BadRequest(new { message = ex.Message });
+    //     }
+    // }
+}
+
+
+
+// BookController
+using Microsoft.AspNetCore.Mvc;
+using System.Data;
+using Microsoft.Data.SqlClient;
+using Newtonsoft.Json.Linq;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+
+namespace jwt_demo.Controllers;
+
+[ApiController]
+[Route("[controller]")] // Updated route here
+public class BookController : ControllerBase
+{
+    private readonly IConfiguration _configuration;
+    private readonly JwtToken _jwt;
+
+    public BookController(IConfiguration configuration)
+    {
+        _configuration = configuration;
+        _jwt = new JwtToken();
+    }
+
+    public class Book
+    {
+        public string Title { get; set; }
+        public string ISBN { get; set; }
+        // Thêm các thuộc tính khác
+    }
+
+    [AllowAnonymous]
+    // GET: /books
+    [HttpGet(Name = "Get_Books")]
+    public async Task<ActionResult> GetBooks()
+    {
+        try
+        {
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            using SqlConnection connection = new(connectionString);
+            await connection.OpenAsync();
+
+            using SqlCommand command = new()
+            {
+                Connection = connection,
+                CommandType = CommandType.Text,
+                CommandText = "SELECT * FROM Books"
+            };
+
+            using SqlDataReader reader = await command.ExecuteReaderAsync();
+            var books = new List<Dictionary<string, object>>();
+
+            while (await reader.ReadAsync())
+            {
+                var book = new Dictionary<string, object>();
+                for (int i = 0; i < reader.FieldCount; i++)
+                {
+                    book[reader.GetName(i)] = reader.IsDBNull(i) ? null : reader.GetValue(i);
+                }
+                books.Add(book);
+            }
+
+            return Ok(new { data = books });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    // [HttpGet]
+    // public async Task<ActionResult<IEnumerable<Book>>> GetBooks()
+    // {
+    //     try
+    //     {
+    //         using var connection = new SqlConnection(_connectionString);
+    //         await connection.OpenAsync();
+
+    //         var command = new SqlCommand("SELECT * FROM Books", connection);
+    //         using var reader = await command.ExecuteReaderAsync();
+
+    //         var books = new List<Book>();
+    //         while (await reader.ReadAsync())
+    //         {
+    //             var book = new Book
+    //             {
+    //                 // Gán các thuộc tính từ reader
+    //                 var book = new Dictionary<string, object>();
+    //                 for (int i = 0; i < reader.FieldCount; i++)
+    //                 {
+    //                     book[reader.GetName(i)] = reader.IsDBNull(i) ? null : reader.GetValue(i);
+    //                 }
+    //                 books.Add(book);
+    //             };
+    //             books.Add(book);
+    //         }
+
+    //         return Ok(books);
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         return BadRequest(new { message = ex.Message });
+    //     }
+    // }
+
+
+    [AllowAnonymous]
+    // POST: /books/add
+    [HttpPost("add")]
+    public async Task<ActionResult> AddBook()
+    {
+        try
+        {
+            using var reader = new StreamReader(Request.Body);
+            var requestBody = await reader.ReadToEndAsync();
+            var bookData = JObject.Parse(requestBody);
+
+            // Kiểm tra các trường bắt buộc
+            if (bookData["Title"] == null || bookData["ISBN"] == null || bookData["Price"] == null)
+            {
+                return BadRequest(new { message = "Title, ISBN, and Price are required." });
+            }
+
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            using SqlConnection connection = new(connectionString);
+            await connection.OpenAsync();
+
+            using SqlCommand command = new()
+            {
+                Connection = connection,
+                CommandType = CommandType.StoredProcedure,
+                CommandText = "AddBook"
+            };
+
+            // Thêm các tham số cho thủ tục
+            command.Parameters.AddWithValue("@Title", bookData["Title"].Value<string>());
+            command.Parameters.AddWithValue("@Author", bookData["Author"]?.Value<string>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@Description", bookData["Description"]?.Value<string>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@ISBN", bookData["ISBN"].Value<string>());
+            command.Parameters.AddWithValue("@PublishedDate", bookData["PublishedDate"]?.Value<DateTime?>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@Price", bookData["Price"].Value<decimal>());
+            command.Parameters.AddWithValue("@StockQuantity", bookData["StockQuantity"]?.Value<int>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@IsAvailableForRent", bookData["IsAvailableForRent"]?.Value<bool>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@RentPrice", bookData["RentPrice"]?.Value<decimal?>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@CategoryID", bookData["CategoryID"]?.Value<int>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@CoverImage", bookData["CoverImage"]?.Value<string>() ?? (object)DBNull.Value);
+
+            await command.ExecuteNonQueryAsync();
+
+            return Ok(new { message = "Book added successfully." });
+        }
+        catch (Exception ex)
+        {
+            // Ghi lại lỗi để phân tích
+            Console.WriteLine($"Error: {ex.Message}, StackTrace: {ex.StackTrace}");
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+
+    // [HttpPost("add")]
+    // public async Task<ActionResult> AddBook()
+    // {
+    //     try
+    //     {
+    // string authHeader = Request.Headers["Authorization"];
+    // if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
+    // {
+    //     return Unauthorized(new { message = "Missing or invalid Authorization header" });
+    // }
+
+    // string token = authHeader["Bearer ".Length..].Trim();
+    // if (!_jwt.ValidateToken(token, out ClaimsPrincipal? claims))
+    // {
+    //     return Unauthorized(new { message = "Token is invalid" });
+    // }
+
+    // // Kiểm tra xem claims có null không
+    // if (claims == null)
+    // {
+    //     return Unauthorized(new { message = "Claims are null" });
+    // }
+
+    // Ghi lại tất cả claims để kiểm tra
+    // foreach (var claim in claims.Claims)
+    // {
+    //     Console.WriteLine($"Claim Type: {claim.Type}, Claim Value: {claim.Value}");
+    // }
+
+    // var userRole = claims.FindFirst(c => c.Type == "Role")?.Value;
+    // Console.WriteLine($"User Role: {userRole}"); // Ghi lại vai trò người dùng
+
+    // Kiểm tra xem người dùng có phải là quản trị viên không
+    // if (userRole != "admin")
+    // {
+    //     return Unauthorized(new { message = "You do not have permission to perform this action." });
+    // }
+
+    // var userName = claims.FindFirst(c => c.Type == "UserName")?.Value;
+
+    // using var reader = new StreamReader(Request.Body);
+    // var requestBody = await reader.ReadToEndAsync();
+    // var bookData = JObject.Parse(requestBody);
+
+    // // Kiểm tra các trường bắt buộc
+    // if (bookData["Title"] == null || bookData["ISBN"] == null || bookData["Price"] == null)
+    // {
+    //     return BadRequest(new { message = "Title, ISBN, and Price are required." });
+    // }
+
+    //         string connectionString = _configuration.GetConnectionString("DefaultConnection");
+    //         using SqlConnection connection = new(connectionString);
+    //         await connection.OpenAsync();
+
+    //         using SqlCommand command = new()
+    //         {
+    //             Connection = connection,
+    //             CommandType = CommandType.StoredProcedure,
+    //             CommandText = "AddBook"
+    //         };
+
+    //         // Thêm các tham số cho thủ tục
+    //         command.Parameters.AddWithValue("@Title", bookData["Title"].Value<string>());
+    //         command.Parameters.AddWithValue("@Author", bookData["Author"]?.Value<string>() ?? (object)DBNull.Value);
+    //         command.Parameters.AddWithValue("@Description", bookData["Description"]?.Value<string>() ?? (object)DBNull.Value);
+    //         command.Parameters.AddWithValue("@ISBN", bookData["ISBN"].Value<string>());
+    //         command.Parameters.AddWithValue("@PublishedDate", bookData["PublishedDate"]?.Value<DateTime?>() ?? (object)DBNull.Value);
+    //         command.Parameters.AddWithValue("@Price", bookData["Price"].Value<decimal>());
+    //         command.Parameters.AddWithValue("@StockQuantity", bookData["StockQuantity"]?.Value<int>() ?? (object)DBNull.Value);
+    //         command.Parameters.AddWithValue("@IsAvailableForRent", bookData["IsAvailableForRent"]?.Value<bool>() ?? (object)DBNull.Value);
+    //         command.Parameters.AddWithValue("@RentPrice", bookData["RentPrice"]?.Value<decimal?>() ?? (object)DBNull.Value);
+    //         command.Parameters.AddWithValue("@CategoryID", bookData["CategoryID"]?.Value<int>() ?? (object)DBNull.Value);
+    //         command.Parameters.AddWithValue("@CoverImage", bookData["CoverImage"]?.Value<string>() ?? (object)DBNull.Value);
+
+    //         await command.ExecuteNonQueryAsync();
+
+    //         return Ok(new { message = "Book added successfully." });
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         // Ghi lại lỗi để phân tích
+    //         Console.WriteLine($"Error: {ex.Message}, StackTrace: {ex.StackTrace}");
+    //         return BadRequest(new { message = ex.Message, stackTrace = ex.StackTrace });
+    //     }
+    // }
+
+    // [HttpPost("add")]
+    // public async Task<ActionResult> AddBook([FromBody] Book book)
+    // {
+    //     if (book == null || string.IsNullOrEmpty(book.Title) || string.IsNullOrEmpty(book.ISBN))
+    //     {
+    //         return BadRequest(new { message = "Missing required fields" });
+    //     }
+
+    //     try
+    //     {
+    //         using var connection = new SqlConnection(_connectionString);
+    //         await connection.OpenAsync();
+
+    //         var command = new SqlCommand("AddBookByAdmin", connection)
+    //         {
+    //             CommandType = CommandType.StoredProcedure
+    //         };
+    //         // Thêm các tham số cho thủ tục
+
+    //         await command.ExecuteNonQueryAsync();
+    //         return Ok(new { message = "Book added successfully." });
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         return BadRequest(new { message = ex.Message });
+    //     }
+    // }
+
+
+    [AllowAnonymous]
+    // PUT: /books/update/{id}
+    [HttpPut("update/{id}")]
+    public async Task<ActionResult> UpdateBook(int id)
+    {
+        try
+        {
+            string authHeader = Request.Headers["Authorization"];
+            if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
+            {
+                return Unauthorized(new { message = "Missing or invalid Authorization header" });
+            }
+
+            string token = authHeader["Bearer ".Length..].Trim();
+            if (!_jwt.ValidateToken(token, out ClaimsPrincipal? claims))
+            {
+                return Unauthorized(new { message = "Token is invalid" });
+            }
+
+            var userRole = claims?.FindFirst(c => c.Type == "Role")?.Value;
+
+            // Kiểm tra xem người dùng có phải là quản trị viên không
+            if (userRole != "admin")
+            {
+                return Unauthorized(new { message = "You do not have permission to perform this action." });
+            }
+
+            var userName = claims?.FindFirst(c => c.Type == "UserName")?.Value;
+
+            using var reader = new StreamReader(Request.Body);
+            var requestBody = await reader.ReadToEndAsync();
+            var bookData = JObject.Parse(requestBody);
+
+            // Kiểm tra các trường bắt buộc
+            if (bookData["Title"] == null || bookData["Price"] == null)
+            {
+                return BadRequest(new { message = "Title and Price are required." });
+            }
+
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            using SqlConnection connection = new(connectionString);
+            await connection.OpenAsync();
+
+            using SqlCommand command = new()
+            {
+                Connection = connection,
+                CommandType = CommandType.StoredProcedure,
+                CommandText = "UpdateBookByAdmin"
+            };
+
+            // Thêm tham số cho thủ tục
+            command.Parameters.AddWithValue("@BookID", id);
+            command.Parameters.AddWithValue("@Title", bookData["Title"]?.Value<string>());
+            command.Parameters.AddWithValue("@Author", bookData["Author"]?.Value<string>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@Description", bookData["Description"]?.Value<string>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@Price", bookData["Price"]?.Value<decimal>());
+            command.Parameters.AddWithValue("@StockQuantity", bookData["StockQuantity"]?.Value<int>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@IsAvailableForRent", bookData["IsAvailableForRent"]?.Value<bool>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@RentPrice", bookData["RentPrice"]?.Value<decimal?>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@CoverImage", bookData["CoverImage"]?.Value<string>() ?? (object)DBNull.Value);
+
+            await command.ExecuteNonQueryAsync();
+
+            return Ok(new { message = "Book updated successfully." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message, stackTrace = ex.StackTrace });
+        }
+    }
+
+    // [HttpPut("update/{id}")]
+    // public async Task<ActionResult> UpdateBook(int id, [FromBody] Book book)
+    // {
+    //     if (book == null || string.IsNullOrEmpty(book.Title))
+    //     {
+    //         return BadRequest(new { message = "Title is required." });
+    //     }
+
+    //     try
+    //     {
+    //         using var connection = new SqlConnection(_connectionString);
+    //         await connection.OpenAsync();
+
+    //         var command = new SqlCommand("UpdateBookByAdmin", connection)
+    //         {
+    //             CommandType = CommandType.StoredProcedure
+    //         };
+    //         // Thêm các tham số cho thủ tục
+
+    //         await command.ExecuteNonQueryAsync();
+    //         return Ok(new { message = "Book updated successfully." });
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         return BadRequest(new { message = ex.Message });
+    //     }
+    // }
+
+    [Authorize(Roles = "admin")]
+    // DELETE: /books/delete/{id}
+    [HttpDelete("delete/{id}")]
+    public async Task<ActionResult> DeleteBook(int id)
+    {
+        try
+        {
+            // Lấy token từ header Authorization
+            string authHeader = Request.Headers["Authorization"];
+            if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
+            {
+                return Unauthorized(new { message = "Missing or invalid Authorization header" });
+            }
+
+            string token = authHeader["Bearer ".Length..].Trim();
+            if (!_jwt.ValidateToken(token, out ClaimsPrincipal? claims))
+            {
+                return Unauthorized(new { message = "Token is invalid" });
+            }
+
+            var userName = claims?.FindFirst(c => c.Type == "UserName")?.Value;
+
+            // Lấy UserID từ tên người dùng
+            int adminUserId;
+            using (var sqlConnection = new SqlConnection(_configuration.GetConnectionString("DefaultConnection")))
+            {
+                await sqlConnection.OpenAsync();
+                using (var sqlCommand = new SqlCommand("SELECT UserID FROM Users WHERE UserName = @UserName", sqlConnection))
+                {
+                    sqlCommand.Parameters.AddWithValue("@UserName", userName);
+                    var result = await sqlCommand.ExecuteScalarAsync();
+                    if (result == null)
+                    {
+                        return NotFound(new { message = "User not found." });
+                    }
+                    adminUserId = (int)result;
+                }
+            }
+
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            using SqlConnection connection = new(connectionString);
+            await connection.OpenAsync();
+
+            using SqlCommand command = new()
+            {
+                Connection = connection,
+                CommandType = CommandType.StoredProcedure,
+                CommandText = "DeleteBookByAdmin"
+            };
+
+            command.Parameters.AddWithValue("@AdminUserID", adminUserId);
+            command.Parameters.AddWithValue("@BookID", id);
+
+            await command.ExecuteNonQueryAsync();
+
+            return Ok(new { message = "Book deleted successfully." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message, stackTrace = ex.StackTrace });
+        }
+    }
+
+    // [HttpDelete("delete/{id}")]
+    // public async Task<ActionResult> DeleteBook(int id)
+    // {
+    //     try
+    //     {
+    //         using var connection = new SqlConnection(_connectionString);
+    //         await connection.OpenAsync();
+
+    //         var command = new SqlCommand("DeleteBookByAdmin", connection)
+    //         {
+    //             CommandType = CommandType.StoredProcedure
+    //         };
+    //         command.Parameters.AddWithValue("@BookID", id);
+
+    //         await command.ExecuteNonQueryAsync();
+    //         return Ok(new { message = "Book deleted successfully." });
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         return BadRequest(new { message = ex.Message });
+    //     }
+    // }
+}
+
+
+
+
+
+23/10/2024
+// BookController
+using Microsoft.AspNetCore.Mvc;
+using System.Data;
+using Microsoft.Data.SqlClient;
+using Newtonsoft.Json.Linq;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+
+namespace jwt_demo.Controllers;
+
+[ApiController]
+[Route("[controller]")] // Updated route here
+public class BookController : ControllerBase
+{
+    private readonly IConfiguration _configuration;
+    private readonly JwtToken _jwt;
+
+    public BookController(IConfiguration configuration)
+    {
+        _configuration = configuration;
+        _jwt = new JwtToken();
+    }
+
+    public class Book
+    {
+        public string Title { get; set; }
+        public string ISBN { get; set; }
+        // Thêm các thuộc tính khác
+    }
+
+    [AllowAnonymous]
+    // GET: /books
+    [HttpGet(Name = "Get_Books")]
+    public async Task<ActionResult> GetBooks()
+    {
+        try
+        {
+            string authHeader = Request.Headers["Authorization"];
+            if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
+            {
+                return Unauthorized(new { message = "Missing or invalid Authorization header" });
+            }
+
+            string token = authHeader["Bearer ".Length..].Trim();
+            if (!_jwt.ValidateToken(token, out ClaimsPrincipal? claims))
+            {
+                return Unauthorized(new { message = "Token is invalid" });
+            }
+
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            using SqlConnection connection = new(connectionString);
+            await connection.OpenAsync();
+
+            using SqlCommand command = new()
+            {
+                Connection = connection,
+                CommandType = CommandType.Text,
+                CommandText = "SELECT * FROM Books"
+            };
+
+            using SqlDataReader reader = await command.ExecuteReaderAsync();
+            var books = new List<Dictionary<string, object>>();
+
+            while (await reader.ReadAsync())
+            {
+                var book = new Dictionary<string, object>();
+                for (int i = 0; i < reader.FieldCount; i++)
+                {
+                    book[reader.GetName(i)] = reader.IsDBNull(i) ? null : reader.GetValue(i);
+                }
+                books.Add(book);
+            }
+
+            return Ok(new { data = books });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    // [HttpGet]
+    // public async Task<ActionResult<IEnumerable<Book>>> GetBooks()
+    // {
+    //     try
+    //     {
+    //         using var connection = new SqlConnection(_connectionString);
+    //         await connection.OpenAsync();
+
+    //         var command = new SqlCommand("SELECT * FROM Books", connection);
+    //         using var reader = await command.ExecuteReaderAsync();
+
+    //         var books = new List<Book>();
+    //         while (await reader.ReadAsync())
+    //         {
+    //             var book = new Book
+    //             {
+    //                 // Gán các thuộc tính từ reader
+    //                 var book = new Dictionary<string, object>();
+    //                 for (int i = 0; i < reader.FieldCount; i++)
+    //                 {
+    //                     book[reader.GetName(i)] = reader.IsDBNull(i) ? null : reader.GetValue(i);
+    //                 }
+    //                 books.Add(book);
+    //             };
+    //             books.Add(book);
+    //         }
+
+    //         return Ok(books);
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         return BadRequest(new { message = ex.Message });
+    //     }
+    // }
+
+
+    [AllowAnonymous]
+    // POST: /books/add
+    [HttpPost("add")]
+    public async Task<ActionResult> AddBook()
+    {
+        try
+        {
+            using var reader = new StreamReader(Request.Body);
+            var requestBody = await reader.ReadToEndAsync();
+            var bookData = JObject.Parse(requestBody);
+
+            // Kiểm tra các trường bắt buộc
+            if (bookData["Title"] == null || bookData["ISBN"] == null || bookData["Price"] == null)
+            {
+                return BadRequest(new { message = "Title, ISBN, and Price are required." });
+            }
+
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            using SqlConnection connection = new(connectionString);
+            await connection.OpenAsync();
+
+            using SqlCommand command = new()
+            {
+                Connection = connection,
+                CommandType = CommandType.StoredProcedure,
+                CommandText = "AddBook"
+            };
+
+            // Thêm các tham số cho thủ tục
+            command.Parameters.AddWithValue("@Title", bookData["Title"].Value<string>());
+            command.Parameters.AddWithValue("@Author", bookData["Author"]?.Value<string>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@Description", bookData["Description"]?.Value<string>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@ISBN", bookData["ISBN"].Value<string>());
+            command.Parameters.AddWithValue("@PublishedDate", bookData["PublishedDate"]?.Value<DateTime?>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@Price", bookData["Price"].Value<decimal>());
+            command.Parameters.AddWithValue("@StockQuantity", bookData["StockQuantity"]?.Value<int>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@IsAvailableForRent", bookData["IsAvailableForRent"]?.Value<bool>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@RentPrice", bookData["RentPrice"]?.Value<decimal?>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@CategoryID", bookData["CategoryID"]?.Value<int>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@CoverImage", bookData["CoverImage"]?.Value<string>() ?? (object)DBNull.Value);
+
+            await command.ExecuteNonQueryAsync();
+
+            return Ok(new { message = "Book added successfully." });
+        }
+        catch (Exception ex)
+        {
+            // Ghi lại lỗi để phân tích
+            Console.WriteLine($"Error: {ex.Message}, StackTrace: {ex.StackTrace}");
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+
+    // [HttpPost("add")]
+    // public async Task<ActionResult> AddBook()
+    // {
+    //     try
+    //     {
+    // string authHeader = Request.Headers["Authorization"];
+    // if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
+    // {
+    //     return Unauthorized(new { message = "Missing or invalid Authorization header" });
+    // }
+
+    // string token = authHeader["Bearer ".Length..].Trim();
+    // if (!_jwt.ValidateToken(token, out ClaimsPrincipal? claims))
+    // {
+    //     return Unauthorized(new { message = "Token is invalid" });
+    // }
+
+    // // Kiểm tra xem claims có null không
+    // if (claims == null)
+    // {
+    //     return Unauthorized(new { message = "Claims are null" });
+    // }
+
+    // Ghi lại tất cả claims để kiểm tra
+    // foreach (var claim in claims.Claims)
+    // {
+    //     Console.WriteLine($"Claim Type: {claim.Type}, Claim Value: {claim.Value}");
+    // }
+
+    // var userRole = claims.FindFirst(c => c.Type == "Role")?.Value;
+    // Console.WriteLine($"User Role: {userRole}"); // Ghi lại vai trò người dùng
+
+    // Kiểm tra xem người dùng có phải là quản trị viên không
+    // if (userRole != "admin")
+    // {
+    //     return Unauthorized(new { message = "You do not have permission to perform this action." });
+    // }
+
+    // var userName = claims.FindFirst(c => c.Type == "UserName")?.Value;
+
+    // using var reader = new StreamReader(Request.Body);
+    // var requestBody = await reader.ReadToEndAsync();
+    // var bookData = JObject.Parse(requestBody);
+
+    // // Kiểm tra các trường bắt buộc
+    // if (bookData["Title"] == null || bookData["ISBN"] == null || bookData["Price"] == null)
+    // {
+    //     return BadRequest(new { message = "Title, ISBN, and Price are required." });
+    // }
+
+    //         string connectionString = _configuration.GetConnectionString("DefaultConnection");
+    //         using SqlConnection connection = new(connectionString);
+    //         await connection.OpenAsync();
+
+    //         using SqlCommand command = new()
+    //         {
+    //             Connection = connection,
+    //             CommandType = CommandType.StoredProcedure,
+    //             CommandText = "AddBook"
+    //         };
+
+    //         // Thêm các tham số cho thủ tục
+    //         command.Parameters.AddWithValue("@Title", bookData["Title"].Value<string>());
+    //         command.Parameters.AddWithValue("@Author", bookData["Author"]?.Value<string>() ?? (object)DBNull.Value);
+    //         command.Parameters.AddWithValue("@Description", bookData["Description"]?.Value<string>() ?? (object)DBNull.Value);
+    //         command.Parameters.AddWithValue("@ISBN", bookData["ISBN"].Value<string>());
+    //         command.Parameters.AddWithValue("@PublishedDate", bookData["PublishedDate"]?.Value<DateTime?>() ?? (object)DBNull.Value);
+    //         command.Parameters.AddWithValue("@Price", bookData["Price"].Value<decimal>());
+    //         command.Parameters.AddWithValue("@StockQuantity", bookData["StockQuantity"]?.Value<int>() ?? (object)DBNull.Value);
+    //         command.Parameters.AddWithValue("@IsAvailableForRent", bookData["IsAvailableForRent"]?.Value<bool>() ?? (object)DBNull.Value);
+    //         command.Parameters.AddWithValue("@RentPrice", bookData["RentPrice"]?.Value<decimal?>() ?? (object)DBNull.Value);
+    //         command.Parameters.AddWithValue("@CategoryID", bookData["CategoryID"]?.Value<int>() ?? (object)DBNull.Value);
+    //         command.Parameters.AddWithValue("@CoverImage", bookData["CoverImage"]?.Value<string>() ?? (object)DBNull.Value);
+
+    //         await command.ExecuteNonQueryAsync();
+
+    //         return Ok(new { message = "Book added successfully." });
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         // Ghi lại lỗi để phân tích
+    //         Console.WriteLine($"Error: {ex.Message}, StackTrace: {ex.StackTrace}");
+    //         return BadRequest(new { message = ex.Message, stackTrace = ex.StackTrace });
+    //     }
+    // }
+
+    // [HttpPost("add")]
+    // public async Task<ActionResult> AddBook([FromBody] Book book)
+    // {
+    //     if (book == null || string.IsNullOrEmpty(book.Title) || string.IsNullOrEmpty(book.ISBN))
+    //     {
+    //         return BadRequest(new { message = "Missing required fields" });
+    //     }
+
+    //     try
+    //     {
+    //         using var connection = new SqlConnection(_connectionString);
+    //         await connection.OpenAsync();
+
+    //         var command = new SqlCommand("AddBookByAdmin", connection)
+    //         {
+    //             CommandType = CommandType.StoredProcedure
+    //         };
+    //         // Thêm các tham số cho thủ tục
+
+    //         await command.ExecuteNonQueryAsync();
+    //         return Ok(new { message = "Book added successfully." });
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         return BadRequest(new { message = ex.Message });
+    //     }
+    // }
+
+
+    [AllowAnonymous]
+    // PUT: /books/update/{id}
+    [HttpPut("update/{id}")]
+    public async Task<ActionResult> UpdateBook(int id)
+    {
+        try
+        {
+            string authHeader = Request.Headers["Authorization"];
+            if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
+            {
+                return Unauthorized(new { message = "Missing or invalid Authorization header" });
+            }
+
+            string token = authHeader["Bearer ".Length..].Trim();
+            if (!_jwt.ValidateToken(token, out ClaimsPrincipal? claims))
+            {
+                return Unauthorized(new { message = "Token is invalid" });
+            }
+
+            var userRole = claims?.FindFirst(c => c.Type == "Role")?.Value;
+
+            // Kiểm tra xem người dùng có phải là quản trị viên không
+            if (userRole != "admin")
+            {
+                return Unauthorized(new { message = "You do not have permission to perform this action." });
+            }
+
+            var userName = claims?.FindFirst(c => c.Type == "UserName")?.Value;
+
+            using var reader = new StreamReader(Request.Body);
+            var requestBody = await reader.ReadToEndAsync();
+            var bookData = JObject.Parse(requestBody);
+
+            // Kiểm tra các trường bắt buộc
+            if (bookData["Title"] == null || bookData["Price"] == null)
+            {
+                return BadRequest(new { message = "Title and Price are required." });
+            }
+
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            using SqlConnection connection = new(connectionString);
+            await connection.OpenAsync();
+
+            using SqlCommand command = new()
+            {
+                Connection = connection,
+                CommandType = CommandType.StoredProcedure,
+                CommandText = "UpdateBookByAdmin"
+            };
+
+            // Thêm tham số cho thủ tục
+            command.Parameters.AddWithValue("@BookID", id);
+            command.Parameters.AddWithValue("@Title", bookData["Title"]?.Value<string>());
+            command.Parameters.AddWithValue("@Author", bookData["Author"]?.Value<string>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@Description", bookData["Description"]?.Value<string>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@Price", bookData["Price"]?.Value<decimal>());
+            command.Parameters.AddWithValue("@StockQuantity", bookData["StockQuantity"]?.Value<int>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@IsAvailableForRent", bookData["IsAvailableForRent"]?.Value<bool>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@RentPrice", bookData["RentPrice"]?.Value<decimal?>() ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@CoverImage", bookData["CoverImage"]?.Value<string>() ?? (object)DBNull.Value);
+
+            await command.ExecuteNonQueryAsync();
+
+            return Ok(new { message = "Book updated successfully." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message, stackTrace = ex.StackTrace });
+        }
+    }
+
+    // [HttpPut("update/{id}")]
+    // public async Task<ActionResult> UpdateBook(int id, [FromBody] Book book)
+    // {
+    //     if (book == null || string.IsNullOrEmpty(book.Title))
+    //     {
+    //         return BadRequest(new { message = "Title is required." });
+    //     }
+
+    //     try
+    //     {
+    //         using var connection = new SqlConnection(_connectionString);
+    //         await connection.OpenAsync();
+
+    //         var command = new SqlCommand("UpdateBookByAdmin", connection)
+    //         {
+    //             CommandType = CommandType.StoredProcedure
+    //         };
+    //         // Thêm các tham số cho thủ tục
+
+    //         await command.ExecuteNonQueryAsync();
+    //         return Ok(new { message = "Book updated successfully." });
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         return BadRequest(new { message = ex.Message });
+    //     }
+    // }
+
+    [Authorize(Roles = "admin")]
+    // DELETE: /books/delete/{id}
+    [HttpDelete("delete/{id}")]
+    public async Task<ActionResult> DeleteBook(int id)
+    {
+        try
+        {
+            // Lấy token từ header Authorization
+            string authHeader = Request.Headers["Authorization"];
+            if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
+            {
+                return Unauthorized(new { message = "Missing or invalid Authorization header" });
+            }
+
+            string token = authHeader["Bearer ".Length..].Trim();
+            if (!_jwt.ValidateToken(token, out ClaimsPrincipal? claims))
+            {
+                return Unauthorized(new { message = "Token is invalid" });
+            }
+
+            var userName = claims?.FindFirst(c => c.Type == "UserName")?.Value;
+
+            // Lấy UserID từ tên người dùng
+            int adminUserId;
+            using (var sqlConnection = new SqlConnection(_configuration.GetConnectionString("DefaultConnection")))
+            {
+                await sqlConnection.OpenAsync();
+                using (var sqlCommand = new SqlCommand("SELECT UserID FROM Users WHERE UserName = @UserName", sqlConnection))
+                {
+                    sqlCommand.Parameters.AddWithValue("@UserName", userName);
+                    var result = await sqlCommand.ExecuteScalarAsync();
+                    if (result == null)
+                    {
+                        return NotFound(new { message = "User not found." });
+                    }
+                    adminUserId = (int)result;
+                }
+            }
+
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            using SqlConnection connection = new(connectionString);
+            await connection.OpenAsync();
+
+            using SqlCommand command = new()
+            {
+                Connection = connection,
+                CommandType = CommandType.StoredProcedure,
+                CommandText = "DeleteBookByAdmin"
+            };
+
+            command.Parameters.AddWithValue("@AdminUserID", adminUserId);
+            command.Parameters.AddWithValue("@BookID", id);
+
+            await command.ExecuteNonQueryAsync();
+
+            return Ok(new { message = "Book deleted successfully." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message, stackTrace = ex.StackTrace });
+        }
+    }
+
+    // [HttpDelete("delete/{id}")]
+    // public async Task<ActionResult> DeleteBook(int id)
+    // {
+    //     try
+    //     {
+    //         using var connection = new SqlConnection(_connectionString);
+    //         await connection.OpenAsync();
+
+    //         var command = new SqlCommand("DeleteBookByAdmin", connection)
+    //         {
+    //             CommandType = CommandType.StoredProcedure
+    //         };
+    //         command.Parameters.AddWithValue("@BookID", id);
+
+    //         await command.ExecuteNonQueryAsync();
+    //         return Ok(new { message = "Book deleted successfully." });
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         return BadRequest(new { message = ex.Message });
+    //     }
+    // }
+}
+
+
+
+
+
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System.Data;
+using Microsoft.Data.SqlClient;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System.Security.Claims;
+
+namespace jwt_demo.Controllers;
+
+[ApiController]
+[Route("[controller]")]
+public class BookController : ControllerBase
+{
+    private readonly IConfiguration _configuration;
+    private readonly JwtToken _jwt;
+
+    public BookController(IConfiguration configuration)
+    {
+        _configuration = configuration;
+        _jwt = new JwtToken();
+    }
+
+    [HttpGet(Name = "Get_Books")]
+    public async Task<ActionResult> GetBooks([FromQuery] int? bookId)
+    {
+        try
+        {
+            string authHeader = "";
+            string token = "";
+
+            // Lấy token từ header Authorization
+            authHeader = Request.Headers["Authorization"];
+            if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
+            {
+                return Unauthorized(new { message = "Missing or invalid Authorization header" });
+            }
+
+            token = authHeader["Bearer ".Length..].Trim();
+
+            // Gọi hàm ValidateToken
+            if (_jwt.ValidateToken(token, out ClaimsPrincipal? claims))
+            {
+                // Token hợp lệ và lấy thông tin userName trong payload
+                var userName = claims?.FindFirst(c => c.Type == "UserName")?.Value;
+
+                string connectionString = _configuration.GetConnectionString("DefaultConnection");
+
+                using SqlConnection connection = new(connectionString);
+                if (connection.State == ConnectionState.Closed)
+                {
+                    await connection.OpenAsync();
+                }
+
+                using SqlCommand command = new();
+                command.Connection = connection;
+                command.CommandType = CommandType.StoredProcedure;
+
+                command.CommandText = "BooksSelectAll";
+                
+
+                SqlDataAdapter da = new(command);
+                DataTable dt = new();
+                da.Fill(dt);
+
+                // Server trả dữ liệu về cho client theo định dạng JSON
+                return new ContentResult
+                {
+                    Content = JsonConvert.SerializeObject(new { data = dt }),
+                    ContentType = "application/json",
+                    StatusCode = 200
+                };
+            }
+            else
+            {
+                // Token không hợp lệ
+                return Unauthorized(new { message = "Token is invalid" });
+            }
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message.ToString() });
+        }
+    }
+
+    // Phương thức GET này lấy tất cả danh sách chủ đề hoặc lấy chủ đề theo mã được truyền vào
+    // int? là cách khai báo có thể truyền vào mã chủ đề hoặc có thể không truyền
+    // Cách thức khi gọi api trong trường hợp này như sau
+    //      1. http://localhost/chude       lấy tất cả danh sách chủ đề
+    //      2. http://localhost/chude/1     lấy chủ đề theo mã chủ đề cụ thể
+    [HttpGet("{chuDeId?}", Name = "Get_Chu_De_With_Another_Way")]
+    public async Task<ActionResult> GetChuDeOther(int? chuDeId)
+    {
+        try
+        {
+            string authHeader = "";
+            string token = "";
+
+            // Lấy token từ header Authorization
+            authHeader = Request.Headers["Authorization"];
+            if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
+            {
+                return Unauthorized(new { message = "Missing or invalid Authorization header" });
+            }
+
+            token = authHeader["Bearer ".Length..].Trim();
+
+            // Gọi hàm ValidateToken
+            if (_jwt.ValidateToken(token, out ClaimsPrincipal? claims))
+            {
+                // Token hợp lệ và lấy thông tin userName trong payload
+                var userName = claims?.FindFirst(c => c.Type == "UserName")?.Value;
+
+                string connectionString = _configuration.GetConnectionString("DefaultConnection");
+                using SqlConnection connection = new(connectionString);
+                if (connection.State == ConnectionState.Closed)
+                {
+                    await connection.OpenAsync();
+                }
+
+                using SqlCommand command = new();
+                command.Connection = connection;
+                command.CommandType = CommandType.StoredProcedure;
+
+                // Nếu có truyền vào mã chủ đề
+                if (chuDeId.HasValue)
+                {
+                    command.CommandText = "spDanhMuc_ChuDeSelectById";
+                    command.Parameters.AddWithValue("@ChuDeID", chuDeId);
+                }
+                else
+                {
+                    command.CommandText = "spDanhMuc_ChuDeSelectALL";
+                }
+
+                SqlDataAdapter da = new(command);
+                DataTable dt = new();
+                da.Fill(dt);
+
+                // Server trả dữ liệu về cho client theo định dạng JSON
+                return new ContentResult
+                {
+                    Content = JsonConvert.SerializeObject(new { data = dt }),
+                    ContentType = "application/json",
+                    StatusCode = 200
+                };
+            }
+            else
+            {
+                // Token không hợp lệ
+                return Unauthorized(new { message = "Token is invalid" });
+            }
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message.ToString() });
+        }
+    }
+
+    // api chude/update dùng để thêm hoặc chỉnh sửa thông tin chủ đề
+    // các tham số (mã chủ đề, tên chủ đề) được truyền trong phần Body
+    // trong câu thủ tục có kiểm tra quyền của người dùng được phép thêm hoặc sửa dữ liệu hay không
+    // thông tin người dùng được lấy từ payload trong token được client truyền vào phần header của gói tin
+    [HttpPost("update")]
+    public async Task<ActionResult> UpdateChuDe()
+    {
+        try
+        {
+            string authHeader = "";
+            string token = "";
+
+            // Lấy token từ header Authorization
+            authHeader = Request.Headers["Authorization"];
+            if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
+            {
+                return Unauthorized(new { message = "Missing or invalid Authorization header" });
+            }
+
+            token = authHeader["Bearer ".Length..].Trim();
+
+            // Gọi hàm ValidateToken
+            if (_jwt.ValidateToken(token, out ClaimsPrincipal? claims))
+            {
+                // Token hợp lệ và lấy thông tin userName trong payload
+                var userName = claims?.FindFirst(c => c.Type == "UserName")?.Value;
+
+                string connectionString = _configuration.GetConnectionString("DefaultConnection");
+                using SqlConnection connection = new(connectionString);
+                if (connection.State == ConnectionState.Closed)
+                {
+                    await connection.OpenAsync();
+                }
+
+                using SqlCommand command = new();
+                command.Connection = connection;
+                command.CommandType = CommandType.StoredProcedure;
+                command.CommandText = "spDanhMuc_ChuDeUpdate";
+
+                // Lấy thông tin MaCD và TenChuDe trong Body
+                using (var reader = new StreamReader(Request.Body))
+                {
+                    var requestBody = await reader.ReadToEndAsync();
+                    var jsonObject = JObject.Parse(requestBody);
+
+                    // Thêm các tham số cho thủ tục
+                    command.Parameters.AddWithValue("@MaCD", jsonObject["MaCD"]?.Value<int>());
+                    command.Parameters.AddWithValue("@TenChuDe", jsonObject["TenChuDe"]?.Value<string>());
+                    command.Parameters.AddWithValue("@UserName", userName);
+                }
+
+                SqlDataAdapter da = new(command);
+                DataTable dt = new();
+                da.Fill(dt);
+
+                // Server gửi thông báo về cho client
+                // dt.Rows[0]["errMsg"] đây là dữ liệu mà trong câu thủ tục trả về               
+                return new ContentResult
+                {
+                    Content = JsonConvert.SerializeObject(new { message = dt.Rows[0]["errMsg"] }),
+                    ContentType = "application/json",
+                    StatusCode = 200
+                };
+            }
+            else
+            {
+                // Token không hợp lệ
+                return Unauthorized(new { message = "Token is invalid" });
+            }
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message.ToString() });
+        }
+    }
+
+    // api chude/delete dùng để xoá thông tin chủ đề
+    // tham số mã chủ đề được truyền trong phần Body
+    // trong câu thủ tục có kiểm tra quyền của người dùng được phép xoá dữ liệu hay không
+    // thông tin người dùng được lấy từ payload trong token được client truyền vào phần header của gói tin
+    [HttpPost("delete")]
+    public async Task<ActionResult> DeleteChuDe()
+    {
+        try
+        {
+            string authHeader = "";
+            string token = "";
+
+            // Lấy token từ header Authorization
+            authHeader = Request.Headers["Authorization"];
+            if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
+            {
+                return Unauthorized(new { message = "Missing or invalid Authorization header" });
+            }
+
+            token = authHeader["Bearer ".Length..].Trim();
+
+            // Gọi hàm ValidateToken
+            if (_jwt.ValidateToken(token, out ClaimsPrincipal? claims))
+            {
+                // Token hợp lệ và lấy thông tin userName trong payload
+                var userName = claims?.FindFirst(c => c.Type == "UserName")?.Value;
+
+                string connectionString = _configuration.GetConnectionString("DefaultConnection");
+                using SqlConnection connection = new(connectionString);
+                if (connection.State == ConnectionState.Closed)
+                {
+                    await connection.OpenAsync();
+                }
+
+                using SqlCommand command = new();
+                command.Connection = connection;
+                command.CommandType = CommandType.StoredProcedure;
+                command.CommandText = "spDanhMuc_ChuDeDelete";
+
+                // Lấy thông tin MaCD và TenChuDe trong Body
+                using (var reader = new StreamReader(Request.Body))
+                {
+                    var requestBody = await reader.ReadToEndAsync();
+                    var jsonObject = JObject.Parse(requestBody);
+
+                    // Thêm các tham số cho thủ tục
+                    command.Parameters.AddWithValue("@MaCD", jsonObject["MaCD"]?.Value<int>());
+                    command.Parameters.AddWithValue("@UserName", userName);
+                }
+
+                SqlDataAdapter da = new(command);
+                DataTable dt = new();
+                da.Fill(dt);
+
+                // Server gửi thông báo về cho client
+                // dt.Rows[0]["errMsg"] đây là dữ liệu mà trong câu thủ tục trả về
+                return new ContentResult
+                {
+                    Content = JsonConvert.SerializeObject(new { message = dt.Rows[0]["errMsg"] }),
+                    ContentType = "application/json",
+                    StatusCode = 200
+                };
+            }
+            else
+            {
+                // Token không hợp lệ
+                return Unauthorized(new { message = "Token is invalid" });
+            }
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message.ToString() });
+        }
+    }
+}
+
+
+
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System.Data;
+using Microsoft.Data.SqlClient;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System.Security.Claims;
+
+namespace jwt_demo.Controllers;
+
+[ApiController]
+[Route("[controller]")]
+public class BookController : ControllerBase
+{
+    private readonly IConfiguration _configuration;
+    private readonly JwtToken _jwt;
+
+    public BookController(IConfiguration configuration)
+    {
+        _configuration = configuration;
+        _jwt = new JwtToken();
+    }
+
+    // Lấy danh sách sách
+    [HttpGet("books")]
+    public async Task<ActionResult> GetBooks()
+    {
+        try
+        {
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            using SqlConnection connection = new(connectionString);
+            await connection.OpenAsync();
+
+            using SqlCommand command = new();
+            command.Connection = connection;
+            command.CommandText = "SELECT * FROM Books";
+            SqlDataAdapter da = new(command);
+            DataTable dt = new();
+            da.Fill(dt);
+
+            return new ContentResult
+            {
+                Content = JsonConvert.SerializeObject(new { data = dt }),
+                ContentType = "application/json",
+                StatusCode = 200
+            };
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    // Thêm sách (chỉ cho admin)
+    [Authorize(Roles = "admin")]
+    [HttpPost("add")]
+    public async Task<ActionResult> AddBook([FromBody] JObject bookData)
+    {
+        try
+        {
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            using SqlConnection connection = new(connectionString);
+            await connection.OpenAsync();
+
+            using SqlCommand command = new();
+            command.Connection = connection;
+            command.CommandText = "AddBookByAdmin"; // Thủ tục lưu trữ để thêm sách
+            command.CommandType = CommandType.StoredProcedure;
+
+            command.Parameters.AddWithValue("@Title", bookData["Title"]?.ToString());
+            command.Parameters.AddWithValue("@Author", bookData["Author"]?.ToString());
+            command.Parameters.AddWithValue("@Description", bookData["Description"]?.ToString());
+            command.Parameters.AddWithValue("@ISBN", bookData["ISBN"]?.ToString());
+            command.Parameters.AddWithValue("@PublishedDate", bookData["PublishedDate"]?.ToString());
+            command.Parameters.AddWithValue("@Price", bookData["Price"]?.ToObject<decimal>() ?? 0);
+            command.Parameters.AddWithValue("@StockQuantity", bookData["StockQuantity"]?.ToObject<int>() ?? 0);
+            command.Parameters.AddWithValue("@IsAvailableForRent", bookData["IsAvailableForRent"]?.ToObject<bool>() ?? false);
+            command.Parameters.AddWithValue("@RentPrice", bookData["RentPrice"]?.ToObject<decimal>() ?? 0);
+            command.Parameters.AddWithValue("@CategoryID", bookData["CategoryID"]?.ToObject<int>() ?? 0);
+            command.Parameters.AddWithValue("@CoverImage", bookData["CoverImage"]?.ToString());
+
+            await command.ExecuteNonQueryAsync();
+
+            return Ok(new { message = "Book added successfully." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    // Sửa sách (chỉ cho admin)
+    [Authorize(Roles = "admin")]
+    [HttpPost("update")]
+    public async Task<ActionResult> UpdateBook([FromBody] JObject bookData)
+    {
+        try
+        {
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            using SqlConnection connection = new(connectionString);
+            await connection.OpenAsync();
+
+            using SqlCommand command = new();
+            command.Connection = connection;
+            command.CommandText = "UpdateBookByAdmin"; // Thủ tục lưu trữ để cập nhật sách
+            command.CommandType = CommandType.StoredProcedure;
+
+            command.Parameters.AddWithValue("@BookID", bookData["BookID"]?.ToObject<int>() ?? 0);
+            command.Parameters.AddWithValue("@Title", bookData["Title"]?.ToString());
+            command.Parameters.AddWithValue("@Author", bookData["Author"]?.ToString());
+            command.Parameters.AddWithValue("@Description", bookData["Description"]?.ToString());
+            command.Parameters.AddWithValue("@ISBN", bookData["ISBN"]?.ToString());
+            command.Parameters.AddWithValue("@PublishedDate", bookData["PublishedDate"]?.ToString());
+            command.Parameters.AddWithValue("@Price", bookData["Price"]?.ToObject<decimal>() ?? 0);
+            command.Parameters.AddWithValue("@StockQuantity", bookData["StockQuantity"]?.ToObject<int>() ?? 0);
+            command.Parameters.AddWithValue("@IsAvailableForRent", bookData["IsAvailableForRent"]?.ToObject<bool>() ?? false);
+            command.Parameters.AddWithValue("@RentPrice", bookData["RentPrice"]?.ToObject<decimal>() ?? 0);
+            command.Parameters.AddWithValue("@CategoryID", bookData["CategoryID"]?.ToObject<int>() ?? 0);
+            command.Parameters.AddWithValue("@CoverImage", bookData["CoverImage"]?.ToString());
+
+            await command.ExecuteNonQueryAsync();
+
+            return Ok(new { message = "Book updated successfully." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    // Xóa sách (chỉ cho admin)
+    [Authorize(Roles = "admin")]
+    [HttpPost("delete")]
+    public async Task<ActionResult> DeleteBook([FromBody] JObject bookData)
+    {
+        try
+        {
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            using SqlConnection connection = new(connectionString);
+            await connection.OpenAsync();
+
+            using SqlCommand command = new();
+            command.Connection = connection;
+            command.CommandText = "DeleteBookByAdmin"; // Thủ tục lưu trữ để xóa sách
+            command.CommandType = CommandType.StoredProcedure;
+
+            command.Parameters.AddWithValue("@BookID", bookData["BookID"]?.ToObject<int>() ?? 0);
+
+            await command.ExecuteNonQueryAsync();
+
+            return Ok(new { message = "Book deleted successfully." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+using Microsoft.AspNetCore.Mvc;
+using System.Data;
+using Microsoft.Data.SqlClient;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System.ComponentModel.DataAnnotations;
+
+namespace jwt_demo.Controllers;
+
+[ApiController]
+[Route("[controller]")]
+public class BookController : ControllerBase
+{
+    private readonly IConfiguration _configuration;
+
+    public BookController(IConfiguration configuration)
+    {
+        _configuration = configuration;
+    }
+
+    public class Book
+    {
+        public string Title { get; set; }
+        public string Author { get; set; }
+        public string Description { get; set; }
+        public string ISBN { get; set; }
+        public DateTime PublishedDate { get; set; }
+        public decimal Price { get; set; }
+        public int StockQuantity { get; set; }
+        public bool IsAvailableForRent { get; set; }
+        public decimal RentPrice { get; set; }
+        public int CategoryID { get; set; }
+        public string CoverImage { get; set; }
+    }
+
+    public class BookUpdateModel
+    {
+        public int BookID { get; set; }
+        public string Title { get; set; }
+        public string Author { get; set; }
+        public string Description { get; set; }
+
+        [Required]
+        public string ISBN { get; set; }
+        public DateTime PublishedDate { get; set; }
+        public decimal Price { get; set; }
+        public int StockQuantity { get; set; }
+        public bool IsAvailableForRent { get; set; }
+        public decimal RentPrice { get; set; }
+        public int CategoryID { get; set; }
+        public string CoverImage { get; set; }
+    }
+
+
+
+    // Lấy danh sách sách
+    [HttpGet("books")]
+    public async Task<ActionResult> GetBooks()
+    {
+        try
+        {
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            using SqlConnection connection = new(connectionString);
+            await connection.OpenAsync();
+
+            using SqlCommand command = new();
+            command.Connection = connection;
+            command.CommandText = "SELECT * FROM Books";
+            SqlDataAdapter da = new(command);
+            DataTable dt = new();
+            da.Fill(dt);
+
+            return new ContentResult
+            {
+                Content = JsonConvert.SerializeObject(new { data = dt }),
+                ContentType = "application/json",
+                StatusCode = 200
+            };
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    // Thêm sách
+    [HttpPost("add")]
+    public async Task<ActionResult> AddBook([FromBody] Book bookData)
+    {
+        if (bookData == null)
+        {
+            return BadRequest(new { message = "Book data is required." });
+        }
+
+        try
+        {
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            using SqlConnection connection = new(connectionString);
+            await connection.OpenAsync();
+
+            using SqlCommand command = new();
+            command.Connection = connection;
+            command.CommandText = "AddBookByAdmin"; // Thủ tục lưu trữ để thêm sách
+            command.CommandType = CommandType.StoredProcedure;
+
+            command.Parameters.AddWithValue("@Title", bookData.Title);
+            command.Parameters.AddWithValue("@Author", bookData.Author);
+            command.Parameters.AddWithValue("@Description", bookData.Description);
+            command.Parameters.AddWithValue("@ISBN", bookData.ISBN);
+            command.Parameters.AddWithValue("@PublishedDate", bookData.PublishedDate);
+            command.Parameters.AddWithValue("@Price", bookData.Price);
+            command.Parameters.AddWithValue("@StockQuantity", bookData.StockQuantity);
+            command.Parameters.AddWithValue("@IsAvailableForRent", bookData.IsAvailableForRent);
+            command.Parameters.AddWithValue("@RentPrice", bookData.RentPrice);
+            command.Parameters.AddWithValue("@CategoryID", bookData.CategoryID);
+            command.Parameters.AddWithValue("@CoverImage", bookData.CoverImage);
+
+            await command.ExecuteNonQueryAsync();
+
+            return Ok(new { message = "Book added successfully." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    // [HttpPost("add")]
+    // public async Task<ActionResult> AddBook([FromBody] JObject bookData)
+    // {
+    //     try
+    //     {
+    //         string connectionString = _configuration.GetConnectionString("DefaultConnection");
+    //         using SqlConnection connection = new(connectionString);
+    //         await connection.OpenAsync();
+
+    //         using SqlCommand command = new();
+    //         command.Connection = connection;
+    //         command.CommandText = "AddBookByAdmin"; // Thủ tục lưu trữ để thêm sách
+    //         command.CommandType = CommandType.StoredProcedure;
+
+    //         command.Parameters.AddWithValue("@Title", bookData["Title"]?.ToString());
+    //         command.Parameters.AddWithValue("@Author", bookData["Author"]?.ToString());
+    //         command.Parameters.AddWithValue("@Description", bookData["Description"]?.ToString());
+    //         command.Parameters.AddWithValue("@ISBN", bookData["ISBN"]?.ToString());
+    //         command.Parameters.AddWithValue("@PublishedDate", bookData["PublishedDate"]?.ToString());
+    //         command.Parameters.AddWithValue("@Price", bookData["Price"]?.ToObject<decimal>() ?? 0);
+    //         command.Parameters.AddWithValue("@StockQuantity", bookData["StockQuantity"]?.ToObject<int>() ?? 0);
+    //         command.Parameters.AddWithValue("@IsAvailableForRent", bookData["IsAvailableForRent"]?.ToObject<bool>() ?? false);
+    //         command.Parameters.AddWithValue("@RentPrice", bookData["RentPrice"]?.ToObject<decimal>() ?? 0);
+    //         command.Parameters.AddWithValue("@CategoryID", bookData["CategoryID"]?.ToObject<int>() ?? 0);
+    //         command.Parameters.AddWithValue("@CoverImage", bookData["CoverImage"]?.ToString());
+
+    //         await command.ExecuteNonQueryAsync();
+
+    //         return Ok(new { message = "Book added successfully." });
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         return BadRequest(new { message = ex.Message });
+    //     }
+    // }
+
+
+    // Sửa sách
+    [HttpPut("update/{bookId}")]
+    public async Task<ActionResult> UpdateBook(int bookId, [FromBody] BookUpdateModel bookData)
+    {
+        if (bookData == null || bookId <= 0)
+        {
+            return BadRequest(new { message = "Valid BookID is required." });
+        }
+
+        try
+        {
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            using SqlConnection connection = new(connectionString);
+            await connection.OpenAsync();
+
+            using SqlCommand command = new();
+            command.Connection = connection;
+            command.CommandText = "UpdateBookByAdmin"; // Thủ tục lưu trữ để cập nhật sách
+            command.CommandType = CommandType.StoredProcedure;
+
+            // Thêm tham số vào lệnh
+            command.Parameters.AddWithValue("@BookID", bookId); // Sử dụng bookId từ đường dẫn
+            command.Parameters.AddWithValue("@Title", bookData.Title);
+            command.Parameters.AddWithValue("@Author", bookData.Author);
+            command.Parameters.AddWithValue("@Description", bookData.Description);
+            command.Parameters.AddWithValue("@Price", bookData.Price);
+            command.Parameters.AddWithValue("@StockQuantity", bookData.StockQuantity);
+            command.Parameters.AddWithValue("@IsAvailableForRent", bookData.IsAvailableForRent);
+            command.Parameters.AddWithValue("@RentPrice", bookData.RentPrice);
+            command.Parameters.AddWithValue("@CategoryID", bookData.CategoryID);
+            command.Parameters.AddWithValue("@CoverImage", bookData.CoverImage);
+
+            // Thực hiện lệnh cập nhật
+            int rowsAffected = await command.ExecuteNonQueryAsync();
+
+            // Kiểm tra xem có bản ghi nào bị ảnh hưởng không
+            if (rowsAffected == 0)
+            {
+                return NotFound(new { message = "No book found with the given BookID." });
+            }
+
+            return Ok(new { message = "Book updated successfully." });
+        }
+        catch (SqlException sqlEx)
+        {
+            return BadRequest(new { message = sqlEx.Message });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+
+    // [HttpPost("update/{bookId}")]
+    // public async Task<ActionResult> UpdateBook(int bookId, [FromBody] BookUpdateModel bookData)
+    // {
+    //     if (bookData == null || bookId <= 0)
+    //     {
+    //         return BadRequest(new { message = "Valid BookID is required." });
+    //     }
+
+    //     try
+    //     {
+    //         string connectionString = _configuration.GetConnectionString("DefaultConnection");
+    //         using SqlConnection connection = new(connectionString);
+    //         await connection.OpenAsync();
+
+    //         using SqlCommand command = new();
+    //         command.Connection = connection;
+    //         command.CommandText = "UpdateBookByAdmin"; // Thủ tục lưu trữ để cập nhật sách
+    //         command.CommandType = CommandType.StoredProcedure;
+
+    //         command.Parameters.AddWithValue("@BookID", bookId); // Sử dụng bookId từ đường dẫn
+    //         command.Parameters.AddWithValue("@Title", bookData.Title);
+    //         command.Parameters.AddWithValue("@Author", bookData.Author);
+    //         command.Parameters.AddWithValue("@Description", bookData.Description);
+    //         command.Parameters.AddWithValue("@ISBN", bookData.ISBN);
+    //         command.Parameters.AddWithValue("@PublishedDate", bookData.PublishedDate);
+    //         command.Parameters.AddWithValue("@Price", bookData.Price);
+    //         command.Parameters.AddWithValue("@StockQuantity", bookData.StockQuantity);
+    //         command.Parameters.AddWithValue("@IsAvailableForRent", bookData.IsAvailableForRent);
+    //         command.Parameters.AddWithValue("@RentPrice", bookData.RentPrice);
+    //         command.Parameters.AddWithValue("@CategoryID", bookData.CategoryID);
+    //         command.Parameters.AddWithValue("@CoverImage", bookData.CoverImage);
+
+    //         await command.ExecuteNonQueryAsync();
+
+    //         return Ok(new { message = "Book updated successfully." });
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         return BadRequest(new { message = ex.Message });
+    //     }
+    // }
+
+
+    // [HttpPost("update")]
+    // public async Task<ActionResult> UpdateBook([FromBody] JObject bookData)
+    // {
+    //     try
+    //     {
+    //         string connectionString = _configuration.GetConnectionString("DefaultConnection");
+    //         using SqlConnection connection = new(connectionString);
+    //         await connection.OpenAsync();
+
+    //         using SqlCommand command = new();
+    //         command.Connection = connection;
+    //         command.CommandText = "UpdateBookByAdmin"; // Thủ tục lưu trữ để cập nhật sách
+    //         command.CommandType = CommandType.StoredProcedure;
+
+    //         command.Parameters.AddWithValue("@BookID", bookData["BookID"]?.ToObject<int>() ?? 0);
+    //         command.Parameters.AddWithValue("@Title", bookData["Title"]?.ToString());
+    //         command.Parameters.AddWithValue("@Author", bookData["Author"]?.ToString());
+    //         command.Parameters.AddWithValue("@Description", bookData["Description"]?.ToString());
+    //         command.Parameters.AddWithValue("@ISBN", bookData["ISBN"]?.ToString());
+    //         command.Parameters.AddWithValue("@PublishedDate", bookData["PublishedDate"]?.ToString());
+    //         command.Parameters.AddWithValue("@Price", bookData["Price"]?.ToObject<decimal>() ?? 0);
+    //         command.Parameters.AddWithValue("@StockQuantity", bookData["StockQuantity"]?.ToObject<int>() ?? 0);
+    //         command.Parameters.AddWithValue("@IsAvailableForRent", bookData["IsAvailableForRent"]?.ToObject<bool>() ?? false);
+    //         command.Parameters.AddWithValue("@RentPrice", bookData["RentPrice"]?.ToObject<decimal>() ?? 0);
+    //         command.Parameters.AddWithValue("@CategoryID", bookData["CategoryID"]?.ToObject<int>() ?? 0);
+    //         command.Parameters.AddWithValue("@CoverImage", bookData["CoverImage"]?.ToString());
+
+    //         await command.ExecuteNonQueryAsync();
+
+    //         return Ok(new { message = "Book updated successfully." });
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         return BadRequest(new { message = ex.Message });
+    //     }
+    // }
+
+    // Xóa sách
+    [HttpPost("delete/{bookId}")]
+    public async Task<ActionResult> DeleteBook(int bookId)
+    {
+        if (bookId <= 0)
+        {
+            return BadRequest(new { message = "Valid BookID is required." });
+        }
+
+        try
+        {
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            using SqlConnection connection = new(connectionString);
+            await connection.OpenAsync();
+
+            using SqlCommand command = new();
+            command.Connection = connection;
+            command.CommandText = "DeleteBookByAdmin"; // Thủ tục lưu trữ để xóa sách
+            command.CommandType = CommandType.StoredProcedure;
+
+            command.Parameters.AddWithValue("@BookID", bookId); // Sử dụng bookId từ đường dẫn
+
+            await command.ExecuteNonQueryAsync();
+
+            return Ok(new { message = "Book deleted successfully." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    // [HttpPost("delete")]
+    // public async Task<ActionResult> DeleteBook([FromBody] JObject bookData)
+    // {
+    //     try
+    //     {
+    //         string connectionString = _configuration.GetConnectionString("DefaultConnection");
+    //         using SqlConnection connection = new(connectionString);
+    //         await connection.OpenAsync();
+
+    //         using SqlCommand command = new();
+    //         command.Connection = connection;
+    //         command.CommandText = "DeleteBookByAdmin"; // Thủ tục lưu trữ để xóa sách
+    //         command.CommandType = CommandType.StoredProcedure;
+
+    //         command.Parameters.AddWithValue("@BookID", bookData["BookID"]?.ToObject<int>() ?? 0);
+
+    //         await command.ExecuteNonQueryAsync();
+
+    //         return Ok(new { message = "Book deleted successfully." });
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         return BadRequest(new { message = ex.Message });
+    //     }
+    // }
+}

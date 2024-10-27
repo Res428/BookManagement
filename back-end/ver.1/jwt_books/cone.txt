@@ -1,0 +1,1 @@
+"DefaultConnection": "server=DESKTOP-FRT6KCM; database=BookManagement; Integrated Security=True; TrustServerCertificate=True;"

@@ -1,0 +1,234 @@
+using System.Data;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Configuration;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.Security.Claims;
+using Newtonsoft.Json;
+
+[ApiController]
+[Route("[controller]")]
+public class RentalController : ControllerBase
+{
+    private readonly IConfiguration _configuration;
+
+    public RentalController(IConfiguration configuration)
+    {
+        _configuration = configuration;
+    }
+
+    private string GetCurrentUserId()
+    {
+        return User.FindFirstValue(ClaimTypes.NameIdentifier);
+    }
+
+    public class CreateRentalRequest
+    {
+        public int UserID { get; set; }
+        public int BookID { get; set; }
+        public DateTime DueDate { get; set; }
+        public decimal TotalRentalCost { get; set; }
+    }
+
+    public class RentalDto
+    {
+        public int RentalID { get; set; }
+        public int BookID { get; set; }
+        public string Title { get; set; }
+        public DateTime RentalDate { get; set; }
+        public DateTime DueDate { get; set; }
+        public decimal TotalRentalCost { get; set; }
+        public string Status { get; set; }
+    }
+
+    [Authorize]
+    // POST: /rental/create
+    [HttpPost("create")]
+    public async Task<ActionResult> CreateRental([FromBody] CreateRentalRequest rentalRequest)
+    {
+        if (rentalRequest == null)
+        {
+            return BadRequest(new { message = "Rental data is required." });
+        }
+
+        try
+        {
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            using SqlConnection connection = new(connectionString);
+            await connection.OpenAsync();
+
+            using SqlCommand command = new()
+            {
+                Connection = connection,
+                CommandType = CommandType.StoredProcedure,
+                CommandText = "CreateRental"
+            };
+
+            command.Parameters.AddWithValue("@UserID", rentalRequest.UserID);
+            command.Parameters.AddWithValue("@BookID", rentalRequest.BookID);
+            command.Parameters.AddWithValue("@DueDate", rentalRequest.DueDate);
+            command.Parameters.AddWithValue("@TotalRentalCost", rentalRequest.TotalRentalCost);
+
+            await command.ExecuteNonQueryAsync();
+
+            return Ok(new { message = "Rental created successfully." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = "Error creating rental: " + ex.Message });
+        }
+    }
+
+    // [Authorize]
+    // // GET: /rental/user/{userId}
+    // [HttpGet("user/{userId}")]
+    // public async Task<ActionResult> GetUserRentals(int userId)
+    // {
+    //     try
+    //     {
+    //         string connectionString = _configuration.GetConnectionString("DefaultConnection");
+    //         using SqlConnection connection = new(connectionString);
+    //         await connection.OpenAsync();
+
+    //         using SqlCommand command = new()
+    //         {
+    //             Connection = connection,
+    //             CommandType = CommandType.StoredProcedure,
+    //             CommandText = "GetUserRentals"
+    //         };
+
+    //         command.Parameters.AddWithValue("@UserID", userId);
+
+    //         using SqlDataReader reader = await command.ExecuteReaderAsync();
+    //         var rentals = new List<RentalDto>();
+
+    //         while (await reader.ReadAsync())
+    //         {
+    //             rentals.Add(new RentalDto
+    //             {
+    //                 RentalID = reader.GetInt32(0),
+    //                 BookID = reader.GetInt32(1),
+    //                 RentalDate = reader.GetDateTime(2),
+    //                 DueDate = reader.GetDateTime(3),
+    //                 TotalRentalCost = reader.GetDecimal(4),
+    //                 Status = reader.GetString(5)
+    //             });
+    //         }
+
+    //         return Ok(new { data = rentals });
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         return BadRequest(new { message = "Error retrieving rentals: " + ex.Message });
+    //     }
+    // }
+
+    // [Authorize]
+    // [HttpGet("user/{userId}")]
+    // public async Task<ActionResult> GetUserRentals(int userId)
+    // {
+    //     // Kiểm tra xem userId có khớp với người dùng hiện tại không
+    //     if (userId.ToString() != GetCurrentUserId())
+    //     {
+    //         return Forbid();
+    //     }
+
+    //     try
+    //     {
+    //         string connectionString = _configuration.GetConnectionString("DefaultConnection");
+    //         using SqlConnection connection = new(connectionString);
+    //         await connection.OpenAsync();
+
+    //         // using SqlCommand command = new()
+    //         // {
+    //         //     Connection = connection,
+    //         //     CommandType = CommandType.StoredProcedure,
+    //         //     CommandText = "GetUserRentals"
+    //         // };
+
+    //         using SqlCommand command = new("GetUserRentals", connection)
+    //         {
+    //             CommandType = CommandType.StoredProcedure
+    //         };
+
+    //         command.Parameters.AddWithValue("@UserID", userId);
+
+    //         using SqlDataReader reader = await command.ExecuteReaderAsync();
+    //         var rentals = new List<RentalDto>();
+
+    //         while (await reader.ReadAsync())
+    //         {
+    //             rentals.Add(new RentalDto
+    //             {
+    //                 RentalID = reader.GetInt32(0),
+    //                 BookID = reader.GetInt32(1),
+    //                 RentalDate = reader.GetDateTime(2),
+    //                 Title = reader.GetString(3), // Chỉnh sửa chỉ số cho đúng
+    //                 DueDate = reader.GetDateTime(4),
+    //                 TotalRentalCost = reader.GetDecimal(5),
+    //                 Status = reader.GetString(6)
+    //             });
+    //         }
+
+    //         return Ok(new { data = rentals });
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         return BadRequest(new { message = "Error retrieving rentals: " + ex.Message });
+    //     }
+    // }
+
+    [Authorize(Roles = "customer")]
+    [HttpGet("{userId}")]
+    public async Task<ActionResult> GetUserBorrowedBooks(int userId)
+    {
+        // Kiểm tra xem userId có khớp với người dùng hiện tại không
+        if (userId.ToString() != GetCurrentUserId())
+        {
+            return Forbid();
+        }
+
+        try
+        {
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            using SqlConnection connection = new(connectionString);
+            await connection.OpenAsync();
+
+            string query = @"
+            SELECT b.BookID, b.Title, b.Author, b.CoverImage, r.RentalDate, r.DueDate, r.Status
+            FROM Rentals r
+            JOIN Books b ON r.BookID = b.BookID
+            WHERE r.UserID = @UserID AND r.Status = 'rented'";
+
+            using SqlCommand command = new(query, connection);
+            command.Parameters.AddWithValue("@UserID", userId);
+
+            using SqlDataReader reader = await command.ExecuteReaderAsync();
+            var borrowedBooks = new List<object>(); // Sử dụng object để linh hoạt trong việc lưu trữ dữ liệu
+
+            while (await reader.ReadAsync())
+            {
+                borrowedBooks.Add(new
+                {
+                    BookID = reader.GetInt32(0),
+                    Title = reader.GetString(1),
+                    Author = reader.GetString(2),
+                    CoverImage = reader.IsDBNull(3) ? null : reader.GetString(3),
+                    RentalDate = reader.GetDateTime(4),
+                    DueDate = reader.GetDateTime(5),
+                    Status = reader.GetString(6)
+                });
+            }
+
+            return Ok(borrowedBooks);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = "Error retrieving borrowed books: " + ex.Message });
+        }
+    }
+
+
+}

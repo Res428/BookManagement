@@ -1,0 +1,397 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System.Data;
+using Microsoft.Data.SqlClient;
+using Newtonsoft.Json.Linq;
+
+namespace jwt_demo.Controllers;
+
+[ApiController]
+[Route("[controller]")]
+public class UserController : ControllerBase
+{
+    private readonly IConfiguration _configuration;
+    public UserController(IConfiguration configuration)
+    {
+        _configuration = configuration;
+    }
+
+    [AllowAnonymous]
+    [HttpPost(Name = "LOGIN")]
+    [Route("login")]
+    public async Task<IActionResult> UserCheckAuthentication()
+    {
+        try
+        {
+            // Nếu không truyền dữ liệu tên đăng nhập và mật khẩu
+            // { "UserName" : "Phuong", "PassWord" : "123" }
+            if (Request.ContentLength == null || Request.ContentLength == 0)
+            {
+                return BadRequest(new { message = "Please input Username and Password!" });
+            }
+
+            string connectionString = _configuration.GetConnectionString("DefaultConnection");
+            using SqlConnection connection = new(connectionString);
+            if (connection.State == ConnectionState.Closed)
+            {
+                await connection.OpenAsync();
+            }
+
+            using SqlCommand command = new();
+            command.Connection = connection;
+            command.CommandType = CommandType.StoredProcedure;
+            command.CommandText = "UserLogin";
+
+            using (var reader = new StreamReader(Request.Body))
+            {
+                var requestBody = await reader.ReadToEndAsync();
+
+                // Parse the JSON content to a JObject
+                var jsonObject = JObject.Parse(requestBody);
+                if (jsonObject["UserName"] == null)
+                    return BadRequest(new { message = "Please input Username!" });
+
+                command.Parameters.AddWithValue("@UserName", jsonObject["UserName"]?.Value<string>());
+                command.Parameters.AddWithValue("@PassWord", jsonObject["PassWord"]?.Value<string>());
+            }
+
+            SqlDataAdapter da = new(command);
+            DataTable dt = new();
+            da.Fill(dt);
+
+            var jwt = new JwtToken();
+
+            var tokenString = jwt.GenerateJwtToken(
+              username: dt.Rows[0]["UserName"].ToString()
+            );
+
+            return Ok(new { token = tokenString });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message.ToString() });
+        }
+    }
+}
+
+
+
+
+
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Add services to the container.
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+// Cấu hình CORS
+// builder.Services.AddCors(options =>
+// {
+//     options.AddPolicy("AllowSpecificOrigin",
+//         builder => builder.WithOrigins("http://localhost:8080") // Thay đổi thành miền frontend của bạn
+//                           .AllowAnyHeader()
+//                           .AllowAnyMethod()
+//                           .AllowCredentials()); // Cho phép cookie, authorization header, hoặc TLS client certificates
+// });
+
+// Cấu hình xác thực JWT
+var key = builder.Configuration["Jwt:Key"];
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        ValidAudience = builder.Configuration["Jwt:Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key))
+    };
+});
+
+var app = builder.Build();
+
+// Configure the HTTP request pipeline.
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseHttpsRedirection();
+
+// Sử dụng CORS trước xác thực và ủy quyền
+// app.UseCors("AllowSpecificOrigin");
+
+app.UseAuthentication(); // Đảm bảo rằng xác thực được sử dụng trước khi ủy quyền
+app.UseAuthorization();
+
+app.MapControllers();
+
+app.Run();
+
+
+
+
+
+
+
+
+
+
+// using Microsoft.AspNetCore.Authentication.JwtBearer;
+// using Microsoft.IdentityModel.Tokens;
+// using System.Text;
+
+// var builder = WebApplication.CreateBuilder(args);
+
+// // Add services to the container.
+// builder.Services.AddControllers();
+// builder.Services.AddEndpointsApiExplorer();
+// builder.Services.AddSwaggerGen();
+
+// // Cấu hình xác thực JWT
+// var key = "anthing_api_key_you_want_anthing_api_key_you_want_anthing_api_key_you_want_anthing_api_key_you_want";
+// builder.Services.AddAuthentication(options =>
+// {
+//     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+//     options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+// })
+// .AddJwtBearer(options =>
+// {
+//     options.TokenValidationParameters = new TokenValidationParameters
+//     {
+//         ValidateIssuer = true,
+//         ValidateAudience = true,
+//         ValidateLifetime = true,
+//         ValidateIssuerSigningKey = true,
+//         ValidIssuer = "http://localhost",
+//         ValidAudience = "bookmanagement api",
+//         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key))
+//     };
+// });
+
+// var app = builder.Build();
+
+// // Configure the HTTP request pipeline.
+// if (app.Environment.IsDevelopment())
+// {
+//     app.UseSwagger();
+//     app.UseSwaggerUI();
+// }
+
+// app.UseHttpsRedirection();
+
+// app.UseAuthentication(); // Đảm bảo rằng xác thực được sử dụng trước khi ủy quyền
+// app.UseAuthorization();
+
+// app.MapControllers();
+
+// app.Run();
+
+
+
+
+// using Microsoft.AspNetCore.Authentication.JwtBearer;
+// using Microsoft.IdentityModel.Tokens;
+// using System.Text;
+
+// var builder = WebApplication.CreateBuilder(args);
+
+// // Add services to the container.
+// builder.Services.AddControllers();
+// builder.Services.AddEndpointsApiExplorer();
+// builder.Services.AddSwaggerGen();
+
+// // Cấu hình xác thực JWT
+// var key = "anthing_api_key_you_want_anthing_api_key_you_want_anthing_api_key_you_want_anthing_api_key_you_want";
+// builder.Services.AddAuthentication(options =>
+// {
+//     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+//     options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+// })
+// .AddJwtBearer(options =>
+// {
+//     options.TokenValidationParameters = new TokenValidationParameters
+//     {
+//         ValidateIssuer = true,
+//         ValidateAudience = true,
+//         ValidateLifetime = true,
+//         ValidateIssuerSigningKey = true,
+//         ValidIssuer = "http://localhost",
+//         ValidAudience = "bookmanagement api",
+//         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key))
+//     };
+// });
+
+// // Cấu hình CORS
+// builder.Services.AddCors(options =>
+// {
+//     options.AddPolicy("AllowAllOrigins",
+//         builder =>
+//         {
+//             builder.AllowAnyOrigin()
+//                    .AllowAnyMethod()
+//                    .AllowAnyHeader();
+//         });
+// });
+
+// var app = builder.Build();
+
+// // Configure the HTTP request pipeline.
+// if (app.Environment.IsDevelopment())
+// {
+//     app.UseSwagger();
+//     app.UseSwaggerUI();
+// }
+
+// app.UseHttpsRedirection();
+
+// app.UseCors("AllowAllOrigins"); // Sử dụng chính sách CORS
+
+// app.UseAuthentication(); // Đảm bảo rằng xác thực được sử dụng trước khi ủy quyền
+// app.UseAuthorization();
+
+// app.MapControllers();
+
+// app.Run();
+
+
+
+//===============================================================
+//===============================================================
+
+// var builder = WebApplication.CreateBuilder(args);
+
+// // Add services to the container.
+
+// builder.Services.AddControllers();
+
+// // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+
+// builder.Services.AddControllers();
+// builder.Services.AddEndpointsApiExplorer();
+// builder.Services.AddSwaggerGen();
+
+// var app = builder.Build();
+
+// // Configure the HTTP request pipeline.
+// if (app.Environment.IsDevelopment())
+// {
+//     app.UseSwagger();
+//     app.UseSwaggerUI();
+// }
+
+// app.UseHttpsRedirection();
+
+
+// app.UseAuthentication();
+// app.UseAuthorization();
+
+// app.MapControllers();
+
+// app.Run();
+
+
+// using Microsoft.AspNetCore.Authentication.JwtBearer;
+// using Microsoft.IdentityModel.Tokens;
+// using System.Text;
+
+// var builder = WebApplication.CreateBuilder(args);
+
+// // Thêm cấu hình xác thực JWT
+// builder.Services.AddAuthentication(options =>
+// {
+//     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+//     options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+// })
+// .AddJwtBearer(options =>
+// {
+//     options.TokenValidationParameters = new TokenValidationParameters
+//     {
+//         ValidateIssuer = true,
+//         ValidateAudience = true,
+//         ValidateLifetime = true,
+//         ValidateIssuerSigningKey = true,
+//         ValidIssuer = builder.Configuration["Jwt:Issuer"],
+//         ValidAudience = builder.Configuration["Jwt:Audience"],
+//         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+//     };
+// });
+
+// // Thêm dịch vụ MVC
+// builder.Services.AddControllers();
+
+// var app = builder.Build();
+
+// // Sử dụng xác thực
+// app.UseAuthentication();
+// app.UseAuthorization();
+
+// app.MapControllers();
+
+// app.Run();
+
+
+// using Microsoft.AspNetCore.Authentication.JwtBearer;
+// using Microsoft.IdentityModel.Tokens;
+// using System.Text;
+
+// var builder = WebApplication.CreateBuilder(args);
+
+// // Add services to the container.
+// builder.Services.AddControllers();
+
+// // Cấu hình xác thực JWT
+// builder.Services.AddAuthentication(options =>
+// {
+//     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+//     options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+// })
+// .AddJwtBearer(options =>
+// {
+//     options.TokenValidationParameters = new TokenValidationParameters
+//     {
+//         ValidateIssuer = true,
+//         ValidateAudience = true,
+//         ValidateLifetime = true,
+//         ValidateIssuerSigningKey = true,
+//         ValidIssuer = builder.Configuration["Jwt:Issuer"],
+//         ValidAudience = builder.Configuration["Jwt:Audience"],
+//         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+//     };
+// });
+
+// // Cấu hình Swagger/OpenAPI
+// builder.Services.AddEndpointsApiExplorer();
+// builder.Services.AddSwaggerGen();
+
+// var app = builder.Build();
+
+// // Configure the HTTP request pipeline.
+// if (app.Environment.IsDevelopment())
+// {
+//     app.UseSwagger();
+//     app.UseSwaggerUI();
+// }
+
+// app.UseHttpsRedirection();
+
+// // Thêm middleware cho xác thực và ủy quyền
+// app.UseAuthentication();
+// app.UseAuthorization();
+
+// app.MapControllers();
+
+// app.Run();

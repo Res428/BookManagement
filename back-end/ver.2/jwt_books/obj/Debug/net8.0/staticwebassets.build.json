@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "c1cMADURYXbmLMl2vMHnBpOR0op6IamSAyHG1FviqSk=",
+  "Source": "jwt_books",
+  "BasePath": "_content/jwt_books",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}
