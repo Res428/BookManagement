@@ -3,6 +3,10 @@
   "WorkspaceRootPath": "D:\\STUDY\\HK7\\LTWEBNANGCAO\\40%\\back-end\\ver.2\\jwt_books\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{5B520C73-1698-4FE6-B7F1-0F8E94F2B489}|jwt_books.csproj|d:\\study\\hk7\\ltwebnangcao\\40%\\back-end\\ver.2\\jwt_books\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{5B520C73-1698-4FE6-B7F1-0F8E94F2B489}|jwt_books.csproj|solutionrelative:program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{5B520C73-1698-4FE6-B7F1-0F8E94F2B489}|jwt_books.csproj|d:\\study\\hk7\\ltwebnangcao\\40%\\back-end\\ver.2\\jwt_books\\controllers\\usercontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{5B520C73-1698-4FE6-B7F1-0F8E94F2B489}|jwt_books.csproj|solutionrelative:controllers\\usercontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
@@ -23,6 +27,19 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
+              "Title": "Program.cs",
+              "DocumentMoniker": "D:\\STUDY\\HK7\\LTWEBNANGCAO\\40%\\back-end\\ver.2\\jwt_books\\Program.cs",
+              "RelativeDocumentMoniker": "Program.cs",
+              "ToolTip": "D:\\STUDY\\HK7\\LTWEBNANGCAO\\40%\\back-end\\ver.2\\jwt_books\\Program.cs",
+              "RelativeToolTip": "Program.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABAAAAAYAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2024-10-28T06:55:00.417Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
               "Title": "UserController.cs",
               "DocumentMoniker": "D:\\STUDY\\HK7\\LTWEBNANGCAO\\40%\\back-end\\ver.2\\jwt_books\\Controllers\\UserController.cs",
               "RelativeDocumentMoniker": "Controllers\\UserController.cs",
@@ -30,8 +47,7 @@
               "RelativeToolTip": "Controllers\\UserController.cs",
               "ViewState": "AgIAADMAAAAAAAAAAAAAAEMAAAAcAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2024-10-23T12:27:47.219Z",
-              "EditorCaption": ""
+              "WhenOpened": "2024-10-23T12:27:47.219Z"
             }
           ]
         }

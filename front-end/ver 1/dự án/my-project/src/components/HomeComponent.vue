@@ -53,35 +53,79 @@
     </main>
 
     <!-- Pop-up thêm sách -->
-    <div v-if="showAddBookPopup" class="popup">
-      <div class="popup-content">
-        <h2>Add New Book</h2>
-        <input v-model="newBook.Title" placeholder="Title" />
-        <input v-model="newBook.Author" placeholder="Author" />
-        <input v-model="newBook.ISBN" placeholder="ISBN" />
-        <textarea
-          v-model="newBook.Description"
-          placeholder="Description"
-        ></textarea>
-        <input
-          v-model="newBook.CategoryID"
-          type="number"
-          placeholder="Category ID"
-        />
-        <input v-model="newBook.PublishedDate" type="date" />
-        <input v-model="newBook.Price" type="number" placeholder="Price" />
-        <input
-          v-model="newBook.StockQuantity"
-          type="number"
-          placeholder="Stock Quantity"
-        />
-        <label>
-          <input type="checkbox" v-model="newBook.IsAvailableForRent" />
-          Available for Rent
-        </label>
-        <input v-model="newBook.CoverImage" placeholder="Cover Image URL" />
-        <button @click="addBook">Add</button>
-        <button @click="closeAddBookPopup">Cancel</button>
+    <div v-if="showAddBookPopup" class="popup-add">
+      <div class="popup-content-add">
+        <div class="pop-up-add-inner">
+          <img
+            v-if="newBook.CoverImage"
+            :src="newBook.CoverImage"
+            alt="Cover Image"
+            class="added-cover-image"
+          />
+          <div class="pop-up-content-add">
+            <h2>Add New Book</h2>
+            <label for="title">Title:</label>
+            <input
+              class="input-add"
+              v-model="newBook.Title"
+              placeholder="Title"
+            />
+            <label for="author">Author:</label>
+            <input
+              class="input-add"
+              v-model="newBook.Author"
+              placeholder="Author"
+            />
+            <label for="description">Description:</label>
+            <textarea
+              class="textarea-add"
+              v-model="newBook.Description"
+              placeholder="Description"
+            ></textarea>
+            <label for="isbn">ISBN:</label>
+            <input
+              class="input-add"
+              v-model="newBook.ISBN"
+              placeholder="ISBN"
+            />
+            <label for="publishedDate">Published Date:</label>
+            <input
+              class="input-add"
+              v-model="newBook.PublishedDate"
+              type="date"
+            />
+            <label for="price">Price:</label>
+            <input
+              class="input-add"
+              v-model="newBook.Price"
+              type="number"
+              placeholder="Price"
+            />
+            <label for="stockQuantity">Stock Quantity:</label>
+            <input
+              class="input-add"
+              v-model="newBook.StockQuantity"
+              type="number"
+              placeholder="Stock Quantity"
+            />
+            <label> Available for Rent </label>
+            <input
+              class="input-add"
+              type="checkbox"
+              v-model="newBook.IsAvailableForRent"
+            />
+            <label for="coverImage">Cover Image URL:</label>
+            <input
+              class="input-add"
+              v-model="newBook.CoverImage"
+              placeholder="Cover Image URL"
+            />
+            <div class="btn-popup-add">
+              <button @click="addBook">Add</button>
+              <button @click="closeAddBookPopup">Cancel</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -451,8 +495,8 @@ nav .active {
 }
 
 .card-description {
-  font-size: 0.9em; 
-  color: #333; 
+  font-size: 0.9em;
+  color: #333;
 }
 .book-cover {
   width: 40%;
@@ -469,6 +513,84 @@ nav .active {
 label {
   font-weight: bold;
 }
+
+/* Pop-up cho thêm sách */
+.popup-add {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7); /* Tăng độ tối của nền */
+  display: flex;
+  justify-content: center;
+  flex-direction: row;
+  align-items: center;
+  z-index: 1000;
+}
+
+.popup-content-add {
+  background-color: #ffffff; /* Đặt màu nền cho pop-up */
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3); /* Thêm bóng cho pop-up */
+  width: 70%; /* Chiều rộng pop-up */
+  max-width: 800px; /* Giới hạn chiều rộng tối đa */
+  display: flex; /* Sử dụng flexbox để căn chỉnh nội dung */
+}
+
+.pop-up-add-inner {
+  color: #000;
+  display: flex;
+  flex-direction: row; /* Đặt chiều ngang cho các thành phần */
+}
+
+.added-cover-image {
+  width: 50%; /* Đảm bảo ảnh không vượt quá chiều rộng */
+  border-radius: 5px; /* Bo góc cho ảnh */
+}
+
+.pop-up-content-add {
+  margin-left: 15px;
+  flex: 1;
+  margin-right: 0%;
+}
+
+label {
+  font-weight: bold;
+  margin-top: 10px; /* Thêm khoảng cách giữa các nhãn */
+}
+
+.input-add,
+.textarea-add {
+  width: 100%; /* Đặt chiều rộng 100% cho các trường nhập liệu */
+  padding: 10px; /* Thêm padding cho các trường nhập liệu */
+  border: 1px solid #ccc; /* Đặt màu viền cho các trường nhập liệu */
+  border-radius: 5px; /* Bo góc cho các trường nhập liệu */
+  margin-bottom: 15px; /* Thêm khoảng cách dưới mỗi trường nhập liệu */
+}
+
+.btn-popup-add {
+  display: flex;
+  justify-content: space-between; /* Căn giữa cho các nút */
+  margin-top: 20px; /* Thêm khoảng cách trên cho nhóm nút */
+}
+
+button {
+  padding: 10px 15px; /* Thêm padding cho nút */
+  background-color: #ffcc00; /* Màu nền cho nút */
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  color: #000;
+  transition: background-color 0.3s; /* Thêm hiệu ứng chuyển màu */
+}
+
+button:hover {
+  background-color: #e6b800; /* Hiệu ứng khi hover */
+}
+
+/*================ */
 
 .popup {
   position: fixed;
@@ -504,7 +626,7 @@ label {
 }
 
 .popup-book-cover {
-  width: 40%;
+  width: 50%;
   border-radius: 5px;
 }
 button {

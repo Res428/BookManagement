@@ -9,7 +9,7 @@
     "Parameters": [
       {
         "Name": "bookData",
-        "Type": "Newtonsoft.Json.Linq.JObject",
+        "Type": "jwt_demo.Controllers.BookController\u002BBook",
         "IsRequired": true
       }
     ],
@@ -28,14 +28,14 @@
   {
     "ContainingType": "jwt_demo.Controllers.BookController",
     "Method": "DeleteBook",
-    "RelativePath": "Book/delete",
+    "RelativePath": "Book/delete/{bookId}",
     "HttpMethod": "POST",
     "IsController": true,
     "Order": 0,
     "Parameters": [
       {
-        "Name": "bookData",
-        "Type": "Newtonsoft.Json.Linq.JObject",
+        "Name": "bookId",
+        "Type": "System.Int32",
         "IsRequired": true
       }
     ],
@@ -44,14 +44,19 @@
   {
     "ContainingType": "jwt_demo.Controllers.BookController",
     "Method": "UpdateBook",
-    "RelativePath": "Book/update",
+    "RelativePath": "Book/update/{bookId}",
     "HttpMethod": "POST",
     "IsController": true,
     "Order": 0,
     "Parameters": [
+      {
+        "Name": "bookId",
+        "Type": "System.Int32",
+        "IsRequired": true
+      },
       {
         "Name": "bookData",
-        "Type": "Newtonsoft.Json.Linq.JObject",
+        "Type": "jwt_demo.Controllers.BookController\u002BBookUpdateModel",
         "IsRequired": true
       }
     ],
@@ -59,30 +64,46 @@
   },
   {
     "ContainingType": "RentalController",
-    "Method": "CreateRental",
-    "RelativePath": "Rental/create",
-    "HttpMethod": "POST",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "rentalData",
-        "Type": "Newtonsoft.Json.Linq.JObject",
-        "IsRequired": true
-      }
-    ],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "RentalController",
-    "Method": "GetUserRentals",
-    "RelativePath": "Rental/user/{userId}",
+    "Method": "GetUserBorrowedBooks",
+    "RelativePath": "Rental/borrowed-books/{userId}",
     "HttpMethod": "GET",
     "IsController": true,
     "Order": 0,
     "Parameters": [
       {
         "Name": "userId",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "RentalController",
+    "Method": "RequestBook",
+    "RelativePath": "Rental/request",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "rentalRequest",
+        "Type": "RentalController\u002BCreateRentalRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "RentalController",
+    "Method": "ReturnBook",
+    "RelativePath": "Rental/return/{rentalId}",
+    "HttpMethod": "PUT",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "rentalId",
         "Type": "System.Int32",
         "IsRequired": true
       }
@@ -129,6 +150,85 @@
     "IsController": true,
     "Order": 0,
     "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "jwt_demo.Controllers.UserController",
+    "Method": "GetUserById",
+    "RelativePath": "User/users/{id}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "id",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "jwt_demo.Controllers.UserController",
+    "Method": "GetUserByUsername",
+    "RelativePath": "User/users/username/{username}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "username",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "WaitApproveController",
+    "Method": "ApproveRental",
+    "RelativePath": "WaitApprove/approve/{rentalId}",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "rentalId",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "WaitApproveController",
+    "Method": "GetPendingRentals",
+    "RelativePath": "WaitApprove/pending",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "WaitApproveController",
+    "Method": "RejectRental",
+    "RelativePath": "WaitApprove/reject/{rentalId}",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "rentalId",
+        "Type": "System.Int32",
+        "IsRequired": true
+      },
+      {
+        "Name": "rejectionRequest",
+        "Type": "WaitApproveController\u002BRejectionRequest",
+        "IsRequired": true
+      }
+    ],
     "ReturnTypes": []
   }
 ]
