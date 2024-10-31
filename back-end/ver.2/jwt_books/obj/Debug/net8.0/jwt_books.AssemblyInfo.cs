@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("jwt_books")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6c98a2a7c17eba0aee51492b7f18b78be3bed77a")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+3b41e63afc52e1c921fd618201f98b005f66263c")]
 [assembly: System.Reflection.AssemblyProductAttribute("jwt_books")]
 [assembly: System.Reflection.AssemblyTitleAttribute("jwt_books")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

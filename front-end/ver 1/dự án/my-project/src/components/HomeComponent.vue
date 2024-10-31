@@ -108,6 +108,13 @@
               type="number"
               placeholder="Stock Quantity"
             />
+            <label for="stockQuantity">CategoryID:</label>
+            <input
+              class="input-add"
+              v-model="newBook.CategoryID"
+              type="number"
+              placeholder="CategoryID"
+            />
             <label> Available for Rent </label>
             <input
               class="input-add"
@@ -616,7 +623,8 @@ button:hover {
   background-color: #7ba0ef;
   border-radius: 10px;
   padding: 15px;
-  width: 50%;
+  max-width: 100%;
+  width: 70%;
 }
 
 .pop-up-content {
